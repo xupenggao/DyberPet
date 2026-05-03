@@ -173,11 +173,25 @@ class DyberPetApp(QApplication):
         self.set_midnight_timer()  # Reset the timer for the next midnight
 
     def _on_ai_pet_created(self, pet_name):
-        settings.pets = settings.get_petlist(os.path.join(settings.basedir, 'res/role'))
+        pets = settings.get_petlist(os.path.join(settings.BASEDIR, 'res/role'))
+        if settings.default_pet in pets:
+            pets.remove(settings.default_pet)
+            pets.sort()
+            pets = [settings.default_pet] + pets
+        else:
+            pets.sort()
+        settings.pets[:] = pets
         settings.scale_dict[pet_name] = 1.0
         settings.defaultAct[pet_name] = None
+        settings.usertag_dict[pet_name] = settings.usertag_dict.get(pet_name, '')
+        settings.pet_data.petsList = settings.pets
+        settings.act_data.petsList = settings.pets
         settings.save_settings()
         self.conp.charCardInterface.refresh_pet_list()
+        self.p.pets = settings.pets
+        self.p._set_menu(settings.pets)
+        self.p._set_Statusmenu()
+        self.p._set_tray()
 
 
         

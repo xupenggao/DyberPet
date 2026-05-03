@@ -457,23 +457,18 @@ For most of time, App can import the character for you automatically. But in any
 
     def refresh_pet_list(self):
         """Refresh character list after a new pet is created via AI."""
-        # Remove existing cards
         for i, charCard in enumerate(self.CharCardList):
             if charCard:
                 charCard.setParent(None)
-                charCard.deleteLater()
         for line in self.CharLineList:
             line.setParent(None)
-            line.deleteLater()
 
-        # Clear the card group widget layout
+        self.expandLayout.removeWidget(self.CharCardGroup)
         self.CharCardGroup.setParent(None)
-        self.CharCardGroup.deleteLater()
 
         self.CharCardList = []
         self.CharLineList = []
 
-        # Rebuild
         self.__initCardLayout()
         self.expandLayout.addWidget(self.CharCardGroup)
         self.__connectSignalToSlot()

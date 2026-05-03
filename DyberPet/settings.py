@@ -321,7 +321,9 @@ def init_settings():
         # AI Pet Creator API config
         global ai_api_key, ai_api_base
         ai_api_key = data_params.get('ai_api_key', '')
-        ai_api_base = data_params.get('ai_api_base', 'https://api.openai.com/v1')
+        ai_api_base = data_params.get('ai_api_base', 'https://ark.cn-beijing.volces.com/api/v3')
+        if ai_api_base == 'https://api.openai.com/v1':
+            ai_api_base = 'https://ark.cn-beijing.volces.com/api/v3'
 
     else:
         fixdragspeedx, fixdragspeedy = 1.0, 1.0
@@ -345,7 +347,7 @@ def init_settings():
         auto_lock = False
         walk_on_active_window = False
         ai_api_key = ''
-        ai_api_base = 'https://api.openai.com/v1'
+        ai_api_base = 'https://ark.cn-beijing.volces.com/api/v3'
     check_locale()
     save_settings()
 

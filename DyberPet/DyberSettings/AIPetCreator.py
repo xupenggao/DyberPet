@@ -1,39 +1,133 @@
 # coding:utf-8
 import os
 
-from PySide6.QtCore import Qt, Signal
+import cv2
+
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QPixmap, QImage
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFileDialog,
-    QStackedWidget, QPushButton, QSizePolicy, QGridLayout,
-    QRadioButton, QButtonGroup, QLineEdit, QComboBox,
+    QStackedWidget, QGridLayout, QScrollArea,
 )
 from qfluentwidgets import (
-    ScrollArea, PushButton, LineEdit, RadioButton, ComboBox,
-    InfoBar, InfoBarPosition, StateToolTip, FluentIcon as FIF,
-    CardWidget, ImageLabel, BodyLabel, SubtitleLabel, TitleLabel,
-    PrimaryPushButton, ProgressRing, ExpandLayout,
+    ScrollArea, PushButton, LineEdit,
+    InfoBar, InfoBarPosition, FluentIcon as FIF,
+    CardWidget, BodyLabel, SubtitleLabel, TitleLabel,
+    PrimaryPushButton, ProgressRing,
 )
 
 import DyberPet.settings as settings
-from .AIPetService import PetFileBuilder, STYLE_PROMPTS, STYLE_NAMES
-from .AIGenerationThread import AIGenerationThread
-
-from sys import platform
+from .AIPetService import REQUIRED_ACTIONS, OPTIONAL_ACTIONS, ALL_ACTIONS, PetFileBuilder
+from .AIGenerationThread import SpriteProcessingThread
+from DyberPet.conf import CheckCharFiles
 
 basedir = settings.BASEDIR
 
+ACTION_ORDER = [
+    "stand", "leftwalk", "sit",
+    "lie", "sleep", "patpat", "drag", "prefall", "fall", "onfloor",
+]
 
-class PhotoPreviewCard(CardWidget):
-    def __init__(self, image_path, parent=None):
+ACTION_LABELS = {
+    "stand": "待机",
+    "leftwalk": "向左行走",
+    "sit": "坐下",
+    "lie": "趴下",
+    "sleep": "睡觉",
+    "patpat": "被摸头",
+    "drag": "被拖拽",
+    "prefall": "下落预备",
+    "fall": "掉落中",
+    "onfloor": "落地",
+}
+
+ACTION_HINTS = {
+    "stand": "5秒绿幕视频（必填）",
+    "leftwalk": "5秒绿幕视频（必填）",
+}
+
+
+class VideoUploadCard(CardWidget):
+    def __init__(self, action_name, parent=None):
         super().__init__(parent)
-        layout = QVBoxLayout(self)
-        pixmap = QPixmap(image_path)
-        label = QLabel()
-        scaled = pixmap.scaled(120, 120, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-        label.setPixmap(scaled)
-        label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(label)
+        self.action_name = action_name
+        self.video_path = None
+        self._is_required = action_name in REQUIRED_ACTIONS
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 8, 12, 8)
+
+        title_row = QHBoxLayout()
+        title_text = ACTION_LABELS.get(action_name, action_name)
+        title_row.addWidget(BodyLabel(title_text))
+        tag_text = "必填" if self._is_required else "选填"
+        tag = BodyLabel(tag_text)
+        tag.setStyleSheet(
+            "color: white; background: #e05555; border-radius: 3px; "
+            "padding: 1px 6px; font-size: 10px;"
+            if self._is_required else
+            "color: #888; background: #eee; border-radius: 3px; "
+            "padding: 1px 6px; font-size: 10px;"
+        )
+        title_row.addWidget(tag)
+        title_row.addStretch()
+
+        info_layout = QVBoxLayout()
+        info_layout.addLayout(title_row)
+        hint_text = ACTION_HINTS.get(action_name, "5秒绿幕视频（选填）")
+        hint = BodyLabel(hint_text)
+        hint.setStyleSheet("color: gray; font-size: 11px;")
+        info_layout.addWidget(hint)
+        layout.addLayout(info_layout, 1)
+
+        self.preview_label = QLabel()
+        self.preview_label.setFixedSize(72, 72)
+        self.preview_label.setAlignment(Qt.AlignCenter)
+        self.preview_label.setStyleSheet("border: 1px dashed #ccc; border-radius: 4px;")
+        layout.addWidget(self.preview_label)
+
+        self.btn_upload = PushButton("上传")
+        self.btn_upload.setFixedWidth(80)
+        self.btn_upload.clicked.connect(self._on_upload)
+        layout.addWidget(self.btn_upload)
+
+        self.btn_clear = PushButton("", self, FIF.CLOSE)
+        self.btn_clear.setFixedWidth(32)
+        self.btn_clear.hide()
+        self.btn_clear.clicked.connect(self._on_clear)
+        layout.addWidget(self.btn_clear)
+
+    def _on_upload(self):
+        label = ACTION_LABELS.get(self.action_name, self.action_name)
+        title = f"上传 {label} 绿幕视频"
+        file, _ = QFileDialog.getOpenFileName(
+            self, title, "",
+            "视频文件 (*.mp4 *.avi *.mov *.wmv *.webm *.mkv)"
+        )
+        if not file:
+            return
+
+        self.video_path = file
+
+        cap = cv2.VideoCapture(file)
+        ret, frame = cap.read()
+        cap.release()
+
+        if ret:
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            h, w, ch = rgb.shape
+            qimg = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()
+            pixmap = QPixmap.fromImage(qimg)
+            scaled = pixmap.scaled(72, 72, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.preview_label.setPixmap(scaled)
+            self.preview_label.setStyleSheet("border: 1px solid #4f91ff; border-radius: 4px;")
+            self.btn_clear.show()
+
+    def _on_clear(self):
+        self.video_path = None
+        self.preview_label.clear()
+        self.preview_label.setStyleSheet("border: 1px dashed #ccc; border-radius: 4px;")
+        self.btn_clear.hide()
 
 
 class AIPetInterface(ScrollArea):
@@ -43,11 +137,8 @@ class AIPetInterface(ScrollArea):
         super().__init__(parent=parent)
         self.setObjectName("AIPetInterface")
         self.sizeHintDyber = (sizeHintDyber[0] - 100, sizeHintDyber[1])
-        self._photos = []
-        self._selected_style = "q_cartoon"
         self._generated_sprites = {}
-        self._gen_thread = None
-        self._state_tooltip = None
+        self._proc_thread = None
 
         self.scrollWidget = QWidget()
         self.setWidget(self.scrollWidget)
@@ -56,212 +147,92 @@ class AIPetInterface(ScrollArea):
         self.main_layout = QVBoxLayout(self.scrollWidget)
         self.main_layout.setContentsMargins(30, 20, 30, 20)
 
-        # Title
-        self.titleLabel = TitleLabel(self.tr("AI Pet Creator"), self)
-        self.main_layout.addWidget(self.titleLabel)
+        title_row = QHBoxLayout()
+        self.titleLabel = TitleLabel(self.tr("自定义桌宠形象"), self)
+        title_row.addWidget(self.titleLabel)
+        title_row.addStretch()
+
+        self.btn_back = PushButton(self.tr("上一步"))
+        self.btn_back.clicked.connect(self._go_back)
+        self.btn_next = PrimaryPushButton(self.tr("处理"))
+        self.btn_next.clicked.connect(self._go_next)
+        title_row.addWidget(self.btn_back)
+        title_row.addWidget(self.btn_next)
+        self.main_layout.addLayout(title_row)
 
         self.descLabel = BodyLabel(
-            self.tr("Upload photos of your pet, and AI will generate a desktop pet character for you.")
+            self.tr("上传桌宠各动作的5秒绿幕视频，系统自动抽取20帧并去除绿色背景生成逐帧图。"
+                    "站立、行走为必传，其他动作可选。"
+                    "\"向右行走\"由\"向左行走\"自动镜像，无需上传。")
         )
+        self.descLabel.setWordWrap(True)
         self.main_layout.addWidget(self.descLabel)
         self.main_layout.addSpacing(10)
 
-        # Stacked pages
         self.stack = QStackedWidget()
         self.main_layout.addWidget(self.stack)
 
         self._setup_page1()
         self._setup_page2()
-        self._setup_page3()
-        self._setup_page4()
-        self._setup_page5()
-
-        # Navigation buttons
-        nav_layout = QHBoxLayout()
-        self.btn_back = PushButton(self.tr("Back"))
-        self.btn_back.clicked.connect(self._go_back)
-        self.btn_next = PrimaryPushButton(self.tr("Next"))
-        self.btn_next.clicked.connect(self._go_next)
-        nav_layout.addStretch()
-        nav_layout.addWidget(self.btn_back)
-        nav_layout.addWidget(self.btn_next)
-        self.main_layout.addLayout(nav_layout)
 
         self.btn_back.hide()
         self._update_nav_buttons()
         self.main_layout.addStretch()
 
-    # ── Page 1: Photo Upload ──────────────────────────────────────────
+    # ── Page 1: Upload Videos ─────────────────────────────────────────────
     def _setup_page1(self):
         page = QWidget()
         layout = QVBoxLayout(page)
 
-        layout.addWidget(SubtitleLabel(self.tr("Step 1: Upload Pet Photos")))
+        layout.addWidget(SubtitleLabel(self.tr("第一步：填写信息与上传视频")))
 
         name_layout = QHBoxLayout()
-        name_layout.addWidget(BodyLabel(self.tr("Pet Name:")))
+        name_layout.addWidget(BodyLabel(self.tr("宠物名称：")))
         self.pet_name_edit = LineEdit()
-        self.pet_name_edit.setPlaceholderText(self.tr("Enter a name for your pet"))
+        self.pet_name_edit.setPlaceholderText(self.tr("请输入桌宠名称"))
         self.pet_name_edit.setClearButtonEnabled(True)
         name_layout.addWidget(self.pet_name_edit)
         layout.addLayout(name_layout)
 
-        btn_layout = QHBoxLayout()
-        self.btn_select_photos = PushButton(self.tr("Select Photos"), self, FIF.PHOTO)
-        self.btn_select_photos.clicked.connect(self._on_select_photos)
-        btn_layout.addWidget(self.btn_select_photos)
-        btn_layout.addWidget(BodyLabel(self.tr("(1-5 photos, support jpg/png)")))
-        btn_layout.addStretch()
-        layout.addLayout(btn_layout)
+        layout.addSpacing(6)
 
-        self.photo_grid = QGridLayout()
-        layout.addLayout(self.photo_grid)
+        hint = BodyLabel(
+            self.tr("上传各动作的5秒绿幕视频（绿色背景），系统自动抽取20帧、去除背景并生成逐帧图。"
+                    "\"向右行走\"由\"向左行走\"自动镜像，无需上传。")
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: gray; font-size: 11px;")
+        layout.addWidget(hint)
+        layout.addSpacing(4)
+
+        self.action_cards = {}
+        for action_name in ACTION_ORDER:
+            card = VideoUploadCard(action_name)
+            self.action_cards[action_name] = card
+            layout.addWidget(card)
 
         layout.addStretch()
         self.stack.addWidget(page)
 
-    def _on_select_photos(self):
-        files, _ = QFileDialog.getOpenFileNames(
-            self, self.tr("Select Pet Photos"), "",
-            "Images (*.png *.jpg *.jpeg *.bmp *.webp)"
-        )
-        if not files:
-            return
-        self._photos = files[:5]
-        self._refresh_photo_grid()
-
-    def _refresh_photo_grid(self):
-        for i in reversed(range(self.photo_grid.count())):
-            w = self.photo_grid.itemAt(i).widget()
-            if w:
-                w.setParent(None)
-                w.deleteLater()
-        for i, path in enumerate(self._photos):
-            card = PhotoPreviewCard(path)
-            self.photo_grid.addWidget(card, i // 3, i % 3)
-
-    # ── Page 2: Style Selection ───────────────────────────────────────
+    # ── Page 2: Preview & Confirm ────────────────────────────────────────
     def _setup_page2(self):
         page = QWidget()
         layout = QVBoxLayout(page)
 
-        layout.addWidget(SubtitleLabel(self.tr("Step 2: Choose Art Style")))
+        layout.addWidget(SubtitleLabel(self.tr("第二步：预览与确认")))
 
-        self.style_group = QButtonGroup(self)
-        for i, (key, label) in enumerate(STYLE_NAMES.items()):
-            rb = RadioButton(self.tr(label))
-            rb.setProperty("style_key", key)
-            self.style_group.addButton(rb, i)
-            layout.addWidget(rb)
-            if i == 0:
-                rb.setChecked(True)
-
-        self.style_group.buttonClicked.connect(self._on_style_changed)
-        layout.addStretch()
-        self.stack.addWidget(page)
-
-    def _on_style_changed(self, btn):
-        self._selected_style = btn.property("style_key")
-
-    # ── Page 3: API Configuration ─────────────────────────────────────
-    def _setup_page3(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-
-        layout.addWidget(SubtitleLabel(self.tr("Step 3: Configure API")))
-
-        provider_layout = QHBoxLayout()
-        provider_layout.addWidget(BodyLabel(self.tr("API Provider:")))
-        self.api_provider = ComboBox()
-        self.api_provider.addItems(["OpenAI", "Custom"])
-        self.api_provider.currentIndexChanged.connect(self._on_provider_changed)
-        provider_layout.addWidget(self.api_provider)
-        provider_layout.addStretch()
-        layout.addLayout(provider_layout)
-
-        base_layout = QHBoxLayout()
-        base_layout.addWidget(BodyLabel(self.tr("API Base URL:")))
-        self.api_base_edit = LineEdit()
-        self.api_base_edit.setText("https://api.openai.com/v1")
-        self.api_base_edit.setClearButtonEnabled(True)
-        base_layout.addWidget(self.api_base_edit)
-        layout.addLayout(base_layout)
-
-        key_layout = QHBoxLayout()
-        key_layout.addWidget(BodyLabel(self.tr("API Key:")))
-        self.api_key_edit = LineEdit()
-        self.api_key_edit.setPlaceholderText("sk-...")
-        self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.api_key_edit.setClearButtonEnabled(True)
-        key_layout.addWidget(self.api_key_edit)
-        layout.addLayout(key_layout)
-
-        test_layout = QHBoxLayout()
-        self.btn_test = PushButton(self.tr("Test Connection"), self, FIF.LINK)
-        self.btn_test.clicked.connect(self._on_test_api)
-        test_layout.addWidget(self.btn_test)
-        test_layout.addStretch()
-        layout.addLayout(test_layout)
-
-        # Load saved config
-        if hasattr(settings, 'ai_api_key') and settings.ai_api_key:
-            self.api_key_edit.setText(settings.ai_api_key)
-        if hasattr(settings, 'ai_api_base') and settings.ai_api_base:
-            self.api_base_edit.setText(settings.ai_api_base)
-
-        layout.addStretch()
-        self.stack.addWidget(page)
-
-    def _on_provider_changed(self, index):
-        if index == 0:
-            self.api_base_edit.setText("https://api.openai.com/v1")
-        else:
-            self.api_base_edit.setText("")
-            self.api_base_edit.setFocus()
-
-    def _on_test_api(self):
-        api_key = self.api_key_edit.text().strip()
-        api_base = self.api_base_edit.text().strip()
-        if not api_key:
-            InfoBar.error(self.tr("Error"), self.tr("Please enter API key"),
-                          parent=self, duration=3000, position=InfoBarPosition.TOP)
-            return
-        ok, msg = PetFileBuilder.test_api_connection(api_key, api_base)
-        if ok:
-            InfoBar.success(self.tr("Success"), self.tr("Connection successful"),
-                            parent=self, duration=3000, position=InfoBarPosition.TOP)
-        else:
-            InfoBar.error(self.tr("Error"), msg,
-                          parent=self, duration=5000, position=InfoBarPosition.TOP)
-
-    # ── Page 4: Generation Progress ───────────────────────────────────
-    def _setup_page4(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-
-        layout.addWidget(SubtitleLabel(self.tr("Step 4: Generating...")))
-
-        self.gen_status_label = BodyLabel(self.tr("Preparing to generate pet sprites..."))
-        layout.addWidget(self.gen_status_label)
+        self.proc_status_label = BodyLabel(self.tr("正在处理视频..."))
+        layout.addWidget(self.proc_status_label)
 
         self.progress_ring = ProgressRing()
-        self.progress_ring.setFixedSize(60, 60)
+        self.progress_ring.setFixedSize(48, 48)
         layout.addWidget(self.progress_ring, alignment=Qt.AlignCenter)
 
         self.action_status_layout = QVBoxLayout()
         layout.addLayout(self.action_status_layout)
 
-        layout.addStretch()
-        self.stack.addWidget(page)
-
-    # ── Page 5: Preview & Confirm ─────────────────────────────────────
-    def _setup_page5(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-
-        layout.addWidget(SubtitleLabel(self.tr("Step 5: Preview & Confirm")))
-
-        self.preview_label = BodyLabel(self.tr("Generated sprites preview:"))
+        self.preview_label = BodyLabel(self.tr("提取的逐帧预览："))
+        self.preview_label.hide()
         layout.addWidget(self.preview_label)
 
         self.preview_grid = QGridLayout()
@@ -271,15 +242,19 @@ class AIPetInterface(ScrollArea):
         self.stack.addWidget(page)
 
     def _show_preview(self):
+        self.preview_label.show()
+        self.progress_ring.hide()
         for i in reversed(range(self.preview_grid.count())):
             w = self.preview_grid.itemAt(i).widget()
             if w:
                 w.setParent(None)
                 w.deleteLater()
 
+        MAX_COLS = 10
         row = 0
         for action_name, frames in self._generated_sprites.items():
-            self.preview_grid.addWidget(BodyLabel(f"{action_name}:"), row, 0)
+            label_text = ACTION_LABELS.get(action_name, action_name)
+            self.preview_grid.addWidget(BodyLabel(f"{label_text}:"), row, 0)
             col = 1
             for frame in frames:
                 if isinstance(frame, QImage):
@@ -287,180 +262,159 @@ class AIPetInterface(ScrollArea):
                 else:
                     pixmap = frame
                 label = QLabel()
-                scaled = pixmap.scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                scaled = pixmap.scaled(48, 48, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
                 label.setPixmap(scaled)
                 self.preview_grid.addWidget(label, row, col)
                 col += 1
+                if col > MAX_COLS:
+                    col = 0
+                    row += 1
             row += 1
 
-    # ── Navigation ────────────────────────────────────────────────────
+    # ── Navigation ───────────────────────────────────────────────────────
     def _current_page(self):
         return self.stack.currentIndex()
+
+    def _set_page(self, index):
+        self.stack.setCurrentIndex(index)
+        QTimer.singleShot(0, lambda: self.verticalScrollBar().setValue(0))
+        self._update_nav_buttons()
 
     def _go_next(self):
         page = self._current_page()
 
         if page == 0:
-            # Validate page 1
             name = self.pet_name_edit.text().strip()
-            if not name:
-                InfoBar.warning(self.tr("Warning"), self.tr("Please enter a pet name"),
+            ok, result = PetFileBuilder.validate_pet_name(name)
+            if not ok:
+                InfoBar.warning(self.tr("警告"), self.tr(result),
                                 parent=self, duration=3000, position=InfoBarPosition.TOP)
                 return
-            if not self._photos:
-                InfoBar.warning(self.tr("Warning"), self.tr("Please select at least one photo"),
-                                parent=self, duration=3000, position=InfoBarPosition.TOP)
-                return
-            # Check pet name not already exist
+            name = result
+            self.pet_name_edit.setText(name)
+
             pet_dir = os.path.join(basedir, "res/role", name)
             if os.path.exists(pet_dir):
-                InfoBar.warning(self.tr("Warning"), self.tr("Pet name already exists, please choose another"),
+                InfoBar.warning(self.tr("警告"), self.tr("该桌宠名称已存在，请换一个名称"),
                                 parent=self, duration=3000, position=InfoBarPosition.TOP)
                 return
+
+            videos = {}
+            for action_name, card in self.action_cards.items():
+                if card.video_path:
+                    videos[action_name] = card.video_path
+
+            missing_required = [
+                ACTION_LABELS[a] for a in REQUIRED_ACTIONS if a not in videos
+            ]
+            if missing_required:
+                InfoBar.warning(self.tr("警告"),
+                                self.tr("请上传必传动作视频：" + "、".join(missing_required)),
+                                parent=self, duration=3000, position=InfoBarPosition.TOP)
+                return
+
+            self._start_processing(videos)
+            self._set_page(1)
+            return
 
         elif page == 1:
-            pass  # Style always valid
-
-        elif page == 2:
-            api_key = self.api_key_edit.text().strip()
-            if not api_key:
-                InfoBar.warning(self.tr("Warning"), self.tr("Please enter API key"),
-                                parent=self, duration=3000, position=InfoBarPosition.TOP)
-                return
-            # Save API config
-            settings.ai_api_key = api_key
-            settings.ai_api_base = self.api_base_edit.text().strip()
-            if not hasattr(settings, 'ai_api_base'):
-                settings.ai_api_base = "https://api.openai.com/v1"
-            settings.save_settings()
-            # Start generation
-            self._start_generation()
-            self.stack.setCurrentIndex(3)
-            self._update_nav_buttons()
-            return
-
-        elif page == 3:
-            # Generation in progress, skip
-            return
-
-        elif page == 4:
-            # Confirm creation
             self._confirm_creation()
             return
-
-        self.stack.setCurrentIndex(self._current_page() + 1)
-        self._update_nav_buttons()
 
     def _go_back(self):
         idx = self._current_page()
         if idx > 0:
-            self.stack.setCurrentIndex(idx - 1)
-            self._update_nav_buttons()
+            self._set_page(idx - 1)
 
     def _update_nav_buttons(self):
         page = self._current_page()
         self.btn_back.setVisible(page > 0)
+        self.btn_next.setEnabled(True)
+        self.btn_back.setEnabled(True)
 
         if page == 0:
-            self.btn_next.setText(self.tr("Next"))
+            self.btn_next.setText(self.tr("处理"))
         elif page == 1:
-            self.btn_next.setText(self.tr("Next"))
-        elif page == 2:
-            self.btn_next.setText(self.tr("Generate"))
-        elif page == 3:
-            self.btn_next.setText(self.tr("Waiting..."))
-            self.btn_next.setEnabled(False)
-            self.btn_back.setEnabled(False)
-        elif page == 4:
-            self.btn_next.setText(self.tr("Confirm & Create"))
-            self.btn_next.setEnabled(True)
-            self.btn_back.setEnabled(True)
-            self.btn_back.setText(self.tr("Regenerate"))
+            self.btn_next.setText(self.tr("确认创建"))
+            self.btn_back.setText(self.tr("上一步"))
 
-    # ── Generation ────────────────────────────────────────────────────
-    def _start_generation(self):
-        api_key = self.api_key_edit.text().strip()
-        api_base = self.api_base_edit.text().strip() or "https://api.openai.com/v1"
-
-        # Clear previous status labels
+    # ── Processing ───────────────────────────────────────────────────────
+    def _start_processing(self, videos):
         for i in reversed(range(self.action_status_layout.count())):
             w = self.action_status_layout.itemAt(i).widget()
             if w:
                 w.setParent(None)
                 w.deleteLater()
 
-        # Add status labels for each action
         self._action_labels = {}
-        for action_name in ["stand", "leftwalk", "rightwalk", "drag", "fall"]:
-            lbl = BodyLabel(f"  {action_name}: pending")
+        all_actions = list(videos.keys())
+        if "leftwalk" in videos:
+            all_actions.append("rightwalk")
+        for action_name in all_actions:
+            label_text = ACTION_LABELS.get(action_name, action_name)
+            lbl = BodyLabel(f"  {label_text}：等待中")
             self.action_status_layout.addWidget(lbl)
             self._action_labels[action_name] = lbl
 
-        self.gen_status_label.setText(self.tr("Generating pet sprites, please wait..."))
+        self.proc_status_label.setText(self.tr("正在处理视频..."))
+        self.progress_ring.show()
+        self.preview_label.hide()
 
-        self._gen_thread = AIGenerationThread(
-            api_key=api_key,
-            api_base=api_base,
-            photos=self._photos,
-            style=self._selected_style,
-            pet_name=self.pet_name_edit.text().strip(),
-        )
-        self._gen_thread.progress.connect(self._on_gen_progress)
-        self._gen_thread.finished.connect(self._on_gen_complete)
-        self._gen_thread.error.connect(self._on_gen_error)
-        self._gen_thread.start()
+        self._proc_thread = SpriteProcessingThread(videos)
+        self._proc_thread.progress.connect(self._on_proc_progress)
+        self._proc_thread.finished.connect(self._on_proc_complete)
+        self._proc_thread.error.connect(self._on_proc_error)
+        self._proc_thread.start()
 
-    def _on_gen_progress(self, action_name, status):
+    def _on_proc_progress(self, action_name, status):
         if action_name in self._action_labels:
-            if status == "generating":
-                self._action_labels[action_name].setText(f"  {action_name}: generating...")
+            label_text = ACTION_LABELS.get(action_name, action_name)
+            if status == "processing":
+                self._action_labels[action_name].setText(f"  {label_text}：处理中...")
             elif status == "done":
-                self._action_labels[action_name].setText(f"  {action_name}: done")
+                self._action_labels[action_name].setText(f"  {label_text}：完成")
 
-    def _on_gen_complete(self, results):
+    def _on_proc_complete(self, results):
         self._generated_sprites = results
-        self.gen_status_label.setText(self.tr("Generation complete!"))
+        self.proc_status_label.setText(self.tr("处理完成！"))
         self._show_preview()
-        self.stack.setCurrentIndex(4)
-        self._update_nav_buttons()
-
-    def _on_gen_error(self, msg):
-        self.gen_status_label.setText(self.tr(f"Generation failed: {msg}"))
-        InfoBar.error(self.tr("Error"), msg,
-                      parent=self, duration=8000, position=InfoBarPosition.TOP)
         self.btn_next.setEnabled(True)
-        self.btn_back.setEnabled(True)
-        self.btn_next.setText(self.tr("Retry"))
-        self.btn_next.clicked.disconnect()
 
-        def retry():
-            self.btn_next.clicked.connect(self._go_next)
-            self.stack.setCurrentIndex(2)
-            self._update_nav_buttons()
+    def _on_proc_error(self, msg):
+        self.proc_status_label.setText(self.tr(f"处理失败：{msg}"))
+        self.progress_ring.hide()
+        InfoBar.error(self.tr("错误"), msg,
+                      parent=self, duration=8000, position=InfoBarPosition.TOP)
+        self.btn_next.setEnabled(False)
 
-        self.btn_next.clicked.connect(retry)
-
-    # ── Confirm ───────────────────────────────────────────────────────
+    # ── Confirm ──────────────────────────────────────────────────────────
     def _confirm_creation(self):
         pet_name = self.pet_name_edit.text().strip()
         target_dir = os.path.join(basedir, "res/role")
 
+        if not self._generated_sprites:
+            InfoBar.warning(self.tr("警告"), self.tr("没有可创建的逐帧图数据"),
+                            parent=self, duration=3000, position=InfoBarPosition.TOP)
+            return
+
         try:
-            PetFileBuilder.build_pet_folder(pet_name, self._generated_sprites, target_dir)
+            pet_dir = PetFileBuilder.build_pet_folder(pet_name, self._generated_sprites, target_dir)
+            stat_code, error_list = CheckCharFiles(pet_dir)
+            if stat_code != 0:
+                detail = "" if error_list is None else ": " + ", ".join(error_list)
+                raise ValueError(f"生成的角色文件不完整 ({stat_code}){detail}")
         except Exception as e:
-            InfoBar.error(self.tr("Error"), self.tr(f"Failed to create pet: {str(e)}"),
+            InfoBar.error(self.tr("错误"), self.tr(f"创建桌宠失败：{str(e)}"),
                           parent=self, duration=5000, position=InfoBarPosition.TOP)
             return
 
-        InfoBar.success(self.tr("Success"), self.tr(f"Pet '{pet_name}' created!"),
+        InfoBar.success(self.tr("成功"), self.tr(f"桌宠「{pet_name}」创建成功！"),
                         parent=self, duration=3000, position=InfoBarPosition.TOP)
 
         self.pet_created.emit(pet_name)
 
-        # Reset wizard
-        self.stack.setCurrentIndex(0)
         self.pet_name_edit.clear()
-        self._photos = []
         self._generated_sprites = {}
-        self._refresh_photo_grid()
-        self._update_nav_buttons()
+        for card in self.action_cards.values():
+            card._on_clear()
+        self._set_page(0)

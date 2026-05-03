@@ -1,307 +1,451 @@
 # coding:utf-8
 import os
+import sys
 import json
-import base64
-from io import BytesIO
+import re
+import shutil
+import tempfile
+from collections import deque
 
-import httpx
-from PySide6.QtCore import QObject, Signal
-from PySide6.QtGui import QPixmap, QImage, QTransform
+import cv2
+import numpy as np
 
-STYLE_PROMPTS = {
-    "q_cartoon": (
-        "Transform this pet photo into a cute Q-version chibi cartoon character suitable for a desktop pet application. "
-        "The character should have a large head, big expressive eyes, small body, and vibrant colors. "
-        "Keep the pet's distinctive features (fur color, markings, ear shape, tail). "
-        "The image MUST have a completely transparent background (PNG with alpha channel). "
-        "Character should be centered in the frame. "
-    ),
-    "pixel_art": (
-        "Transform this pet photo into a retro pixel art sprite suitable for a desktop pet application. "
-        "Use a limited color palette, clean pixel edges, and 16-32px style proportions. "
-        "Keep the pet's distinctive features recognizable. "
-        "The image MUST have a completely transparent background (PNG with alpha channel). "
-        "Character should be centered in the frame. "
-    ),
-    "simplified": (
-        "Transform this pet photo into a clean, simplified cartoon illustration suitable for a desktop pet application. "
-        "Use smooth lines, flat colors with minimal shading, and a friendly appealing look. "
-        "Keep the pet's distinctive features (fur color, markings, ear shape, tail). "
-        "The image MUST have a completely transparent background (PNG with alpha channel). "
-        "Character should be centered in the frame. "
-    ),
-}
+from PySide6.QtCore import QObject, Signal, QRect, Qt
+from PySide6.QtGui import QPixmap, QImage, QPainter, QColor
 
-STYLE_NAMES = {
-    "q_cartoon": "Q-version Cartoon",
-    "pixel_art": "Pixel Art",
-    "simplified": "Simplified Cartoon",
-}
+_project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
+DEFAULT_FRAME_WIDTH = 128
+DEFAULT_FRAME_HEIGHT = 128
+MIN_FRAME_DIM = 32
+
+NUM_EXTRACT_FRAMES = 20
+
+GREEN_STRICT_MIN = 120
+GREEN_STRICT_DOMINANCE = 45
+GREEN_FEATHER_MIN = 95
+GREEN_FEATHER_DOMINANCE = 25
 
 REQUIRED_ACTIONS = {
     "stand": {
-        "description": "standing idle, front-facing, neutral cute pose",
-        "num_frames": 2,
+        "description": "待机",
     },
     "leftwalk": {
-        "description": "walking to the left, side view, legs in mid-stride",
-        "num_frames": 3,
-    },
-    "drag": {
-        "description": "being dragged, surprised or startled expression, stretched pose",
-        "num_frames": 1,
-    },
-    "fall": {
-        "description": "falling downward, surprised expression, body stretched vertically",
-        "num_frames": 1,
+        "description": "向左走路动作",
     },
 }
 
+OPTIONAL_ACTIONS = {
+    "sit": {
+        "description": "坐下动作",
+    },
+    "lie": {
+        "description": "趴下动作",
+    },
+    "sleep": {
+        "description": "睡觉动作",
+    },
+    "patpat": {
+        "description": "被摸头动作",
+    },
+    "drag": {
+        "description": "被拖拽动作",
+    },
+    "prefall": {
+        "description": "即将下落的预备动作",
+    },
+    "fall": {
+        "description": "向下掉落动作",
+    },
+    "onfloor": {
+        "description": "落到地面后的动作",
+    },
+}
 
-class AIPetGenerator(QObject):
+ALL_ACTIONS = {**REQUIRED_ACTIONS, **OPTIONAL_ACTIONS}
+
+
+class SpriteSheetProcessor(QObject):
     progress_updated = Signal(str, str)
-    generation_complete = Signal(dict)
-    generation_error = Signal(str)
+    processing_complete = Signal(dict)
+    processing_error = Signal(str)
 
-    def __init__(self, api_key, api_base="https://api.openai.com/v1", parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.api_key = api_key
-        self.api_base = api_base.rstrip("/")
         self._cancelled = False
 
     def cancel(self):
         self._cancelled = True
 
-    def generate_pet_sprites(self, photos, style, pet_name):
+    def process_uploaded_videos(self, videos):
         self._cancelled = False
         results = {}
 
-        style_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["q_cartoon"])
-
-        reference_b64 = []
-        for path in photos:
-            with open(path, "rb") as f:
-                reference_b64.append(base64.b64encode(f.read()).decode())
-
-        for action_name, action_info in REQUIRED_ACTIONS.items():
+        for action_name, video_path in videos.items():
             if self._cancelled:
-                self.generation_error.emit("Cancelled by user")
+                self.processing_error.emit("用户已取消")
                 return
 
-            self.progress_updated.emit(action_name, "generating")
+            self.progress_updated.emit(action_name, "processing")
 
-            frames = self._generate_action(
-                reference_b64, style_prompt, pet_name, action_name, action_info
-            )
+            frames = self._process_video(video_path, action_name)
             if frames is None:
                 return
 
             results[action_name] = frames
             self.progress_updated.emit(action_name, "done")
 
-        # rightwalk = mirror of leftwalk
         if "leftwalk" in results and not self._cancelled:
             results["rightwalk"] = self._mirror_frames(results["leftwalk"])
             self.progress_updated.emit("rightwalk", "done")
 
         if not self._cancelled:
-            self.generation_complete.emit(results)
+            self.processing_complete.emit(results)
 
-    def _generate_action(self, reference_b64, style_prompt, pet_name, action_name, action_info):
-        num_frames = action_info["num_frames"]
-        frame_note = f"Generate {num_frames} frame(s) arranged side by side in a single horizontal strip." if num_frames > 1 else "Generate a single frame."
+    def _process_video(self, video_path, action_name):
+        from tools.loop_maker.video_io import extract_frames
 
-        prompt = (
-            f"{style_prompt}\n"
-            f"Action: {action_info['description']}\n"
-            f"{frame_note}\n"
-            f"Each frame should be exactly 128x128 pixels. "
-            f"The total image width should be {128 * num_frames} pixels and height 128 pixels. "
-            f"Output as PNG with transparent background."
+        frames, _ = extract_frames(video_path, target_fps=12)
+        if not frames:
+            self.processing_error.emit(f"无法从视频中提取帧：{video_path}")
+            return None
+
+        segment = self._find_loop(frames)
+
+        keyed_frames = []
+        for rgb in segment:
+            h, w, ch = rgb.shape
+            qimg = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()
+            keyed = self._remove_green_screen(qimg)
+            keyed_frames.append(keyed)
+
+        bboxes = []
+        for f in keyed_frames:
+            bbox = self._find_subject_bounds(f)
+            if bbox is None:
+                self.processing_error.emit("视频帧中未检测到主体")
+                return None
+            bboxes.append(bbox)
+
+        max_w = max(b.width() for b in bboxes)
+        max_h = max(b.height() for b in bboxes)
+
+        frame_w, frame_h = self._calculate_adaptive_frame_size(max_w, max_h)
+
+        rendered = [
+            self._render_frame_from_bbox(f, b, max_w, max_h, frame_w, frame_h)
+            for f, b in zip(keyed_frames, bboxes)
+        ]
+        return rendered
+
+    MIN_OUTPUT_FRAMES = 10
+
+    def _find_loop(self, frames):
+        n = len(frames)
+
+        try:
+            from tools.loop_maker.loop_finder import find_best_loop
+            start, end, score = find_best_loop(
+                frames,
+                min_gap=max(5, n // 10),
+                max_frames=min(60, n),
+                similarity_threshold=0.8,
+                use_pose=False,
+            )
+            if start is not None and (end - start) >= self.MIN_OUTPUT_FRAMES:
+                return frames[start:end]
+        except Exception:
+            pass
+
+        target = max(self.MIN_OUTPUT_FRAMES, NUM_EXTRACT_FRAMES)
+        if n <= target:
+            return list(frames)
+        indices = [int(i * (n - 1) / (target - 1)) for i in range(target)]
+        return [frames[i] for i in indices]
+
+    # ── Green screen removal (BFS flood fill) ──────────────────────────
+
+    def _find_subject_bounds(self, image):
+        width, height = image.width(), image.height()
+        min_x, min_y = width, height
+        max_x, max_y = -1, -1
+
+        for y in range(height):
+            for x in range(width):
+                if image.pixelColor(x, y).alpha() > 24:
+                    if x < min_x:
+                        min_x = x
+                    if y < min_y:
+                        min_y = y
+                    if x > max_x:
+                        max_x = x
+                    if y > max_y:
+                        max_y = y
+
+        if max_x < 0 or max_y < 0:
+            return None
+        return QRect(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
+
+    def _remove_green_screen(self, image):
+        image = image.convertToFormat(QImage.Format.Format_ARGB32)
+        width, height = image.width(), image.height()
+        visited = set()
+        queue = deque(self._green_screen_seed_points(width, height))
+
+        while queue:
+            x, y = queue.popleft()
+            if x < 0 or y < 0 or x >= width or y >= height or (x, y) in visited:
+                continue
+            color = image.pixelColor(x, y)
+            visited.add((x, y))
+            if color.alpha() <= 8:
+                continue
+            if not self._is_green_screen(color, relaxed=True):
+                continue
+
+            color.setAlpha(0)
+            image.setPixelColor(x, y, color)
+            queue.extend(((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)))
+
+        self._remove_dark_borders(image)
+        self._feather_green_edges(image)
+        return image
+
+    def _green_screen_seed_points(self, width, height):
+        seeds = set()
+        for x in range(width):
+            seeds.add((x, 0))
+            seeds.add((x, height - 1))
+        for y in range(height):
+            seeds.add((0, y))
+            seeds.add((width - 1, y))
+
+        step = max(1, min(width, height) // 8)
+        for y in range(step, height - 1, step):
+            for x in range(step, width - 1, step):
+                seeds.add((x, y))
+        return seeds
+
+    def _is_green_screen(self, color, relaxed=False):
+        green = color.green()
+        dominance = green - max(color.red(), color.blue())
+        if relaxed:
+            return green >= GREEN_FEATHER_MIN and dominance >= GREEN_FEATHER_DOMINANCE
+        return green >= GREEN_STRICT_MIN and dominance >= GREEN_STRICT_DOMINANCE
+
+    def _remove_dark_borders(self, image):
+        width, height = image.width(), image.height()
+        visited = set()
+        queue = deque()
+        for x in range(width):
+            queue.append((x, 0))
+            queue.append((x, height - 1))
+        for y in range(height):
+            queue.append((0, y))
+            queue.append((width - 1, y))
+
+        while queue:
+            x, y = queue.popleft()
+            if x < 0 or y < 0 or x >= width or y >= height or (x, y) in visited:
+                continue
+            visited.add((x, y))
+            color = image.pixelColor(x, y)
+            if color.alpha() <= 8:
+                continue
+            if color.red() > 30 or color.green() > 30 or color.blue() > 30:
+                continue
+            color.setAlpha(0)
+            image.setPixelColor(x, y, color)
+            queue.extend(((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)))
+
+    def _feather_green_edges(self, image):
+        width, height = image.width(), image.height()
+        to_clear = []
+        to_feather = []
+
+        for y in range(height):
+            for x in range(width):
+                color = image.pixelColor(x, y)
+                if color.alpha() <= 8 or not self._is_green_screen(color, relaxed=True):
+                    continue
+                if not self._has_transparent_neighbor(image, x, y):
+                    continue
+                if self._is_green_screen(color, relaxed=False):
+                    to_clear.append((x, y))
+                else:
+                    to_feather.append((x, y))
+
+        for x, y in to_clear:
+            color = image.pixelColor(x, y)
+            color.setAlpha(0)
+            image.setPixelColor(x, y, color)
+
+        for x, y in to_feather:
+            color = image.pixelColor(x, y)
+            color.setAlpha(min(color.alpha(), 96))
+            image.setPixelColor(x, y, color)
+
+    def _has_transparent_neighbor(self, image, x, y):
+        width, height = image.width(), image.height()
+        for nx in (x - 1, x, x + 1):
+            for ny in (y - 1, y, y + 1):
+                if nx == x and ny == y:
+                    continue
+                if nx < 0 or ny < 0 or nx >= width or ny >= height:
+                    continue
+                if image.pixelColor(nx, ny).alpha() <= 8:
+                    return True
+        return False
+
+    # ── Rendering ──────────────────────────────────────────────────────
+
+    def _calculate_adaptive_frame_size(self, subject_w, subject_h):
+        if subject_w <= 0 or subject_h <= 0:
+            return DEFAULT_FRAME_WIDTH, DEFAULT_FRAME_HEIGHT
+        aspect = subject_w / subject_h
+        if aspect >= 1.0:
+            fw = DEFAULT_FRAME_WIDTH
+            fh = max(MIN_FRAME_DIM, round(DEFAULT_FRAME_WIDTH / aspect))
+        else:
+            fh = DEFAULT_FRAME_HEIGHT
+            fw = max(MIN_FRAME_DIM, round(DEFAULT_FRAME_HEIGHT * aspect))
+        return fw, fh
+
+    def _render_frame_from_bbox(self, image, bbox, max_width, max_height, frame_w, frame_h):
+        action_box = QImage(max_width, max_height, QImage.Format.Format_ARGB32)
+        action_box.fill(QColor(0, 0, 0, 0))
+
+        crop = image.copy(bbox)
+        painter = QPainter(action_box)
+        painter.drawImage(
+            (max_width - crop.width()) // 2,
+            max_height - crop.height(),
+            crop,
         )
+        painter.end()
 
-        image_bytes = self._call_api(prompt, reference_b64)
-        if image_bytes is None:
-            return None
+        scaled = action_box.scaled(
+            frame_w, frame_h,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        frame = QImage(frame_w, frame_h, QImage.Format.Format_ARGB32_Premultiplied)
+        frame.fill(Qt.GlobalColor.transparent)
 
-        return self._extract_frames(image_bytes, num_frames, 128)
-
-    def _call_api(self, prompt, reference_images):
-        try:
-            content = [{"type": "text", "text": prompt}]
-            for img_b64 in reference_images[:3]:
-                content.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{img_b64}"},
-                })
-
-            payload = {
-                "model": "gpt-4o",
-                "messages": [{"role": "user", "content": content}],
-                "max_tokens": 4096,
-            }
-
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            }
-
-            # Use chat completions API to generate with image input
-            # The response may include generated image via gpt-4o image output
-            with httpx.Client(timeout=120) as client:
-                resp = client.post(
-                    f"{self.api_base}/chat/completions",
-                    headers=headers,
-                    json=payload,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-
-            message = data["choices"][0]["message"]
-
-            # Check if response contains generated image (gpt-4o image output)
-            if hasattr(message, "get") and message.get("content"):
-                for part in message.get("content", []):
-                    if isinstance(part, dict) and part.get("type") == "image_url":
-                        img_url = part["image_url"]["url"]
-                        if img_url.startswith("data:"):
-                            b64 = img_url.split(",", 1)[1]
-                            return base64.b64decode(b64)
-                        else:
-                            return self._download_image(img_url)
-
-            # Fallback: try DALL-E endpoint for pure generation
-            return self._call_dalle(prompt, reference_images)
-
-        except httpx.HTTPStatusError as e:
-            self.generation_error.emit(f"API error: {e.response.status_code} - {e.response.text}")
-            return None
-        except Exception as e:
-            self.generation_error.emit(f"Network error: {str(e)}")
-            return None
-
-    def _call_dalle(self, prompt, reference_images):
-        try:
-            # Use DALL-E 3 for image generation
-            dalle_prompt = prompt.replace("This pet photo", "A pet character")
-
-            payload = {
-                "model": "dall-e-3",
-                "prompt": dalle_prompt,
-                "n": 1,
-                "size": "1024x1024",
-                "quality": "standard",
-                "response_format": "b64_json",
-            }
-
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            }
-
-            with httpx.Client(timeout=120) as client:
-                resp = client.post(
-                    f"{self.api_base}/images/generations",
-                    headers=headers,
-                    json=payload,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-
-            b64 = data["data"][0]["b64_json"]
-            return base64.b64decode(b64)
-
-        except Exception as e:
-            self.generation_error.emit(f"DALL-E error: {str(e)}")
-            return None
-
-    def _download_image(self, url):
-        try:
-            with httpx.Client(timeout=60) as client:
-                resp = client.get(url)
-                resp.raise_for_status()
-                return resp.content
-        except Exception as e:
-            self.generation_error.emit(f"Download error: {str(e)}")
-            return None
-
-    def _extract_frames(self, image_bytes, num_frames, frame_size):
-        img = QImage()
-        img.loadFromData(image_bytes)
-        if img.isNull():
-            self.generation_error.emit("Failed to load generated image")
-            return None
-
-        frames = []
-        total_width = img.width()
-        frame_width = total_width // num_frames
-        for i in range(num_frames):
-            rect = QRect(i * frame_width, 0, frame_width, img.height())
-            frame = img.copy(rect)
-            # Scale to target frame size
-            if frame.width() != frame_size or frame.height() != frame_size:
-                frame = frame.scaled(
-                    frame_size, frame_size,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-            frames.append(frame)
-        return frames
+        painter = QPainter(frame)
+        painter.drawImage(
+            (frame_w - scaled.width()) // 2,
+            frame_h - scaled.height(),
+            scaled,
+        )
+        painter.end()
+        return frame
 
     def _mirror_frames(self, frames):
         mirrored = []
-        transform = QTransform().scale(-1, 1)
         for frame in frames:
-            pixmap = QPixmap.fromImage(frame)
-            mirrored_px = pixmap.transformed(transform)
-            mirrored.append(mirrored_px.toImage())
+            mirrored.append(frame.mirrored(True, False))
         return mirrored
 
 
-from PySide6.QtCore import QRect, Qt
-
-
 class PetFileBuilder:
+    SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_\-一-鿿]{1,32}$")
+
+    @staticmethod
+    def validate_pet_name(pet_name):
+        name = pet_name.strip()
+        if not name:
+            return False, "请输入桌宠名称"
+        if name in (".", "..") or not PetFileBuilder.SAFE_NAME_RE.match(name):
+            return False, "名称只能包含字母、数字、中文、下划线和连字符（最长32字符）"
+        return True, name
+
     @staticmethod
     def build_pet_folder(pet_name, sprites, target_dir):
+        ok, result = PetFileBuilder.validate_pet_name(pet_name)
+        if not ok:
+            raise ValueError(result)
+        pet_name = result
+
+        required = set(REQUIRED_ACTIONS.keys()) | {"rightwalk"}
+        missing = sorted(required - set(sprites.keys()))
+        if missing:
+            raise ValueError("缺少必传动作逐帧图：" + ", ".join(missing))
+
+        os.makedirs(target_dir, exist_ok=True)
         pet_dir = os.path.join(target_dir, pet_name)
-        action_dir = os.path.join(pet_dir, "action")
-        info_dir = os.path.join(pet_dir, "info")
-        os.makedirs(action_dir, exist_ok=True)
-        os.makedirs(info_dir, exist_ok=True)
+        if os.path.exists(pet_dir):
+            raise FileExistsError(f"桌宠文件夹已存在：{pet_name}")
 
-        for action_name, frames in sprites.items():
-            for i, frame in enumerate(frames):
-                if isinstance(frame, QImage):
-                    pixmap = QPixmap.fromImage(frame)
-                else:
-                    pixmap = frame
-                path = os.path.join(action_dir, f"{action_name}_{i}.png")
-                pixmap.save(path, "PNG")
+        build_dir = tempfile.mkdtemp(prefix=f".{pet_name}.creating_", dir=target_dir)
+        try:
+            action_dir = os.path.join(build_dir, "action")
+            info_dir = os.path.join(build_dir, "info")
+            os.makedirs(action_dir, exist_ok=True)
+            os.makedirs(info_dir, exist_ok=True)
 
-        pet_conf = PetFileBuilder._generate_pet_conf()
-        with open(os.path.join(pet_dir, "pet_conf.json"), "w", encoding="utf-8") as f:
-            json.dump(pet_conf, f, indent=2, ensure_ascii=False)
+            for action_name, frames in sprites.items():
+                for i, frame in enumerate(frames):
+                    if isinstance(frame, QImage):
+                        pixmap = QPixmap.fromImage(frame)
+                    else:
+                        pixmap = frame
+                    path = os.path.join(action_dir, f"{action_name}_{i}.png")
+                    pixmap.save(path, "PNG")
 
-        act_conf = PetFileBuilder._generate_act_conf(sprites)
-        with open(os.path.join(pet_dir, "act_conf.json"), "w", encoding="utf-8") as f:
-            json.dump(act_conf, f, indent=2, ensure_ascii=False)
+            max_fw, max_fh = DEFAULT_FRAME_WIDTH, DEFAULT_FRAME_HEIGHT
+            for frames in sprites.values():
+                if frames:
+                    first = frames[0]
+                    if isinstance(first, QImage):
+                        max_fw = max(max_fw, first.width())
+                        max_fh = max(max_fh, first.height())
 
-        info = {
-            "petName": pet_name,
-            "author": "AI Generated",
-            "version": "1.0",
-        }
-        with open(os.path.join(info_dir, "info.json"), "w", encoding="utf-8") as f:
-            json.dump(info, f, indent=2, ensure_ascii=False)
+            pet_conf = PetFileBuilder._generate_pet_conf(sprites, max_fw, max_fh)
+            with open(os.path.join(build_dir, "pet_conf.json"), "w", encoding="utf-8") as f:
+                json.dump(pet_conf, f, indent=2, ensure_ascii=False)
+
+            act_conf = PetFileBuilder._generate_act_conf(sprites)
+            with open(os.path.join(build_dir, "act_conf.json"), "w", encoding="utf-8") as f:
+                json.dump(act_conf, f, indent=2, ensure_ascii=False)
+
+            info = {
+                "petName": pet_name,
+                "author": {
+                    "name": "用户自定义",
+                    "infos": "用户上传绿幕视频生成",
+                    "frameColor": "#4f91ff",
+                },
+                "tages": {
+                    "自定义": "#BDD7EE",
+                },
+                "intro": "由用户上传的绿幕视频创建。",
+                "version": "1.0",
+            }
+            with open(os.path.join(info_dir, "info.json"), "w", encoding="utf-8") as f:
+                json.dump(info, f, indent=2, ensure_ascii=False)
+
+            from DyberPet.conf import CheckCharFiles
+            stat_code, error_list = CheckCharFiles(build_dir)
+            if stat_code != 0:
+                detail = "" if error_list is None else ": " + ", ".join(error_list)
+                raise ValueError(f"角色文件不完整 ({stat_code}){detail}")
+
+            os.rename(build_dir, pet_dir)
+        except Exception:
+            if os.path.exists(build_dir):
+                shutil.rmtree(build_dir)
+            raise
 
         return pet_dir
 
     @staticmethod
-    def _generate_pet_conf():
-        return {
-            "width": 128,
-            "height": 128,
+    def _generate_pet_conf(sprites, frame_w=DEFAULT_FRAME_WIDTH, frame_h=DEFAULT_FRAME_HEIGHT):
+        conf = {
+            "width": frame_w,
+            "height": frame_h,
             "scale": 1.0,
             "refresh": 5,
             "interact_speed": 0.02,
@@ -311,71 +455,97 @@ class PetFileBuilder:
             "left": "left_walk",
             "right": "right_walk",
             "drag": "drag",
+            "prefall": "prefall",
             "fall": "fall",
-            "on_floor": "default",
-            "random_act": [
-                {"name": "idle", "act_list": ["default"], "act_prob": 0.8, "act_type": [2, 0]},
-                {"name": "walk", "act_list": ["left_walk", "right_walk", "default"], "act_prob": 0.2, "act_type": [3, 1]},
-            ],
+            "on_floor": "onfloor",
+            "patpat": "patpat" if "patpat" in sprites else "default",
         }
+
+        random_act = [
+            {"name": "idle", "act_list": ["default"], "act_prob": 0.8, "act_type": [2, 0]},
+        ]
+
+        if "leftwalk" in sprites:
+            random_act.append(
+                {"name": "walk", "act_list": ["left_walk", "right_walk", "default"], "act_prob": 0.35, "act_type": [3, 1]}
+            )
+
+        if "sit" in sprites:
+            random_act.append(
+                {"name": "sit", "act_list": ["sit"], "act_prob": 0.25, "act_type": [2, 0]}
+            )
+
+        if "lie" in sprites:
+            act_list = ["lie"]
+            if "sleep" in sprites:
+                act_list.append("sleep")
+            act_list.append("default")
+            random_act.append(
+                {"name": "lie", "act_list": act_list, "act_prob": 0.2, "act_type": [1, 0]}
+            )
+
+        if "sleep" in sprites and "lie" not in sprites:
+            random_act.append(
+                {"name": "sleep", "act_list": ["sleep"], "act_prob": 0.15, "act_type": [0, 0]}
+            )
+
+        random_act.append(
+            {"name": "onfloor", "act_list": ["onfloor"], "act_prob": 0, "act_type": [0, 10000]}
+        )
+
+        conf["random_act"] = random_act
+        return conf
 
     @staticmethod
     def _generate_act_conf(sprites):
         conf = {
             "default": {
                 "images": "stand",
-                "act_num": len(sprites.get("stand", [])),
-                "frame_refresh": 0.5,
+                "act_num": 1,
+                "frame_refresh": 0.13,
             },
         }
 
         if "leftwalk" in sprites:
             conf["left_walk"] = {
                 "images": "leftwalk",
-                "act_num": len(sprites["leftwalk"]),
+                "act_num": 1,
                 "need_move": True,
                 "direction": "left",
-                "frame_refresh": 0.2,
+                "frame_move": 3,
+                "frame_refresh": 0.08,
             }
 
         if "rightwalk" in sprites:
             conf["right_walk"] = {
                 "images": "rightwalk",
-                "act_num": len(sprites["rightwalk"]),
+                "act_num": 1,
                 "need_move": True,
                 "direction": "right",
-                "frame_refresh": 0.2,
+                "frame_move": 3,
+                "frame_refresh": 0.08,
             }
 
-        if "drag" in sprites:
-            conf["drag"] = {
-                "images": "drag",
-                "act_num": len(sprites["drag"]),
-            }
+        for action_name in ("sit", "lie", "sleep", "patpat"):
+            if action_name in sprites:
+                conf[action_name] = {
+                    "images": action_name,
+                    "act_num": 1,
+                    "frame_refresh": 0.11,
+                }
 
-        if "fall" in sprites:
-            conf["fall"] = {
-                "images": "fall",
-                "act_num": len(sprites["fall"]),
-            }
+        for action_name in ("drag", "prefall", "fall", "onfloor"):
+            if action_name in sprites:
+                conf[action_name] = {
+                    "images": action_name,
+                    "act_num": 1,
+                    "frame_refresh": 0.08,
+                }
+            else:
+                conf[action_name] = {
+                    "images": "stand",
+                    "act_num": 1,
+                    "frame_refresh": 0.08,
+                }
 
         return conf
-
-    @staticmethod
-    def test_api_connection(api_key, api_base="https://api.openai.com/v1"):
-        try:
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            }
-            with httpx.Client(timeout=15) as client:
-                resp = client.get(
-                    f"{api_base.rstrip('/')}/models",
-                    headers=headers,
-                )
-                resp.raise_for_status()
-                return True, "Connection successful"
-        except httpx.HTTPStatusError as e:
-            return False, f"API error: {e.response.status_code}"
-        except Exception as e:
-            return False, f"Connection failed: {str(e)}"

@@ -94,9 +94,10 @@ class ActiveWindowTracker:
             if appName contains "DyberPet" or appName contains "Python" then return ""
             if (count of windows of frontApp) is 0 then return ""
             set frontWindow to front window of frontApp
+            set windowTitle to name of frontWindow
             set {xPos, yPos} to position of frontWindow
             set {wSize, hSize} to size of frontWindow
-            return appName & tab & xPos & tab & yPos & tab & wSize & tab & hSize
+            return appName & tab & windowTitle & tab & xPos & tab & yPos & tab & wSize & tab & hSize
         end tell
         '''
         try:
@@ -112,10 +113,10 @@ class ActiveWindowTracker:
                 return None
 
             parts = output.split("\t")
-            if len(parts) != 5:
+            if len(parts) != 6:
                 return None
 
-            owner, left, top, width, height = parts
+            owner, title, left, top, width, height = parts
             left = int(float(left))
             top = int(float(top))
             width = int(float(width))
@@ -127,7 +128,7 @@ class ActiveWindowTracker:
                 left + width,
                 top + height,
                 owner=owner,
-                handle=owner,
+                handle=f"{owner}:{title}",
             )
             return surface if surface.usable() else None
         except Exception:

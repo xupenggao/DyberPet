@@ -431,17 +431,16 @@ class PetWidget(QWidget):
         self.active_window_spawn_timer = QTimer(self)
         self.active_window_spawn_timer.setSingleShot(True)
         self.active_window_spawn_timer.timeout.connect(self._start_active_window_excursion)
-        self.active_window_return_timer = QTimer(self)
-        self.active_window_return_timer.setSingleShot(True)
-        self.active_window_return_timer.timeout.connect(self._finish_active_window_excursion)
         self.active_window_walk_timer = QTimer(self)
         self.active_window_walk_timer.timeout.connect(self._active_window_walk_step)
         self.active_window_excursion = False
         self.active_window_home_state = None
+        self.active_window_surface_key = None
         self.active_window_walk_direction = 1
         self.active_window_walk_frame = 0
         self.active_window_act_frame = 0
         self.active_window_mode = 'walk'
+        self.active_window_idle_current_name = None
         self.active_window_phase_timer = QElapsedTimer()
         self.active_window_phase_duration = 0
 
@@ -1356,7 +1355,6 @@ class PetWidget(QWidget):
 
     def _stop_active_window_timers(self):
         self.active_window_spawn_timer.stop()
-        self.active_window_return_timer.stop()
         self.active_window_walk_timer.stop()
         self.active_window_timer.stop()
 
@@ -1386,6 +1384,7 @@ class PetWidget(QWidget):
         }
         self.active_window_excursion = True
         self.active_window_surface = surface
+        self.active_window_surface_key = self._active_window_surface_key(surface)
         self.active_window_miss_count = 0
         self.active_window_walk_direction = random.choice([-1, 1])
         self.active_window_walk_frame = 0
@@ -1413,7 +1412,6 @@ class PetWidget(QWidget):
         self._active_window_walk_step()
         if not self.active_window_timer.isActive():
             self.active_window_timer.start()
-        self.active_window_return_timer.start(random.randint(12000, 25000))
 
     def _set_active_window_phase(self, mode=None):
         if mode is None:
@@ -1426,12 +1424,20 @@ class PetWidget(QWidget):
             self.active_window_phase_duration = random.randint(2500, 6500)
             self.active_window_walk_direction = random.choice([-1, 1])
             self.active_window_idle_current_act = None
+            self.active_window_idle_current_name = None
         else:
             self.active_window_phase_duration = random.randint(1400, 4200)
             self.active_window_idle_current_act = None
+            self.active_window_idle_current_name = None
+
+    def _active_window_surface_key(self, surface):
+        if surface is None:
+            return None
+        if surface.handle:
+            return surface.handle
+        return surface.owner
 
     def _finish_active_window_excursion(self, reschedule=True):
-        self.active_window_return_timer.stop()
         self.active_window_walk_timer.stop()
         self.active_window_timer.stop()
 
@@ -1439,6 +1445,7 @@ class PetWidget(QWidget):
         self.active_window_excursion = False
         self.active_window_home_state = None
         self.active_window_surface = None
+        self.active_window_surface_key = None
         self.active_window_miss_count = 0
         self.active_window_mode = 'walk'
         self.active_window_act_frame = 0
@@ -1531,11 +1538,16 @@ class PetWidget(QWidget):
             'onfloor', 'sleep', 'fall_asleep',
             'default'
         ]
-        available = [self.pet_conf.act_dict[name] for name in candidates if name in self.pet_conf.act_dict]
+        available = [(name, self.pet_conf.act_dict[name]) for name in candidates if name in self.pet_conf.act_dict]
         if not available:
             self.active_window_idle_current_act = self.pet_conf.default
+            self.active_window_idle_current_name = 'default'
         else:
-            self.active_window_idle_current_act = random.choice(available)
+            act_name, act = random.choice(available)
+            self.active_window_idle_current_name = act_name
+            self.active_window_idle_current_act = act
+            if act_name == 'sleep':
+                self.active_window_phase_duration = 20000
         return self.active_window_idle_current_act
 
     def _poll_active_window_surface(self):
@@ -1550,11 +1562,13 @@ class PetWidget(QWidget):
             return
 
         self.active_window_miss_count = 0
+        if self._active_window_surface_key(surface) != self.active_window_surface_key:
+            self._finish_active_window_excursion()
+            return
+
+        self.active_window_surface = surface
         self._switch_screen_for_surface(surface)
-        if surface != self.active_window_surface:
-            self.active_window_surface = surface
-            self._sync_floor_pos()
-            self._snap_to_floor()
+        self._sync_floor_pos()
 
     def _switch_screen_for_surface(self, surface):
         point = QPoint(surface.center_x, surface.center_y)

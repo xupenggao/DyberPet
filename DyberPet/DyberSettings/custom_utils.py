@@ -1234,6 +1234,8 @@ class CharCardWidget(SimpleCardWidget):
         self.hBoxLayoutTags = QHBoxLayout()
         self.hBoxLayoutTags.setContentsMargins(0, 0, 0, 0)
         tags = infoConfig.get("tages", {})
+        if not isinstance(tags, dict):
+            tags = {}
         for text, color in tags.items():
             stylesheet="InfoBadge {padding: 2px 6px 2px 6px; color: black;}"
             tagWidget = InfoBadge.custom(text, color, color)
@@ -1256,6 +1258,10 @@ class CharCardWidget(SimpleCardWidget):
 
         # Author Info
         authorInfo = infoConfig.get("author", {})
+        if isinstance(authorInfo, str):
+            authorInfo = {"name": authorInfo}
+        elif not isinstance(authorInfo, dict):
+            authorInfo = {}
         self.hBoxLayoutAuthor = QHBoxLayout()
         self.hBoxLayoutAuthor.setContentsMargins(8, 0, 8, 0)
 

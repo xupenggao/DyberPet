@@ -55,7 +55,7 @@ class ControlMainWindow(FluentWindow):
                              self.tr('Mini-Pets'))
         self.addSubInterface(self.aiPetInterface,
                              FIF.ROBOT,
-                             self.tr('AI Create Pet'))
+                             self.tr('自定义桌宠'))
 
 
         self.navigationInterface.setExpandWidth(200)
