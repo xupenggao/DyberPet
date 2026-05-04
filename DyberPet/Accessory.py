@@ -677,12 +677,17 @@ class MouseMoveManager(QObject):
         self._listener.start()
 
     def _handle_move(self, x, y):
-        #if not pressed:
-        self.moved.emit(x, y)
+        try:
+            self.moved.emit(x, y)
+        except RuntimeError:
+            self._listener.stop()
 
     def _handle_click(self, x, y, button, pressed):
-        if button == mouse.Button.left:
-            self.clicked.emit(pressed)
+        try:
+            if button == mouse.Button.left:
+                self.clicked.emit(pressed)
+        except RuntimeError:
+            self._listener.stop()
 
 
 class QItemLabel(QLabel):

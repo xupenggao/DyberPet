@@ -129,14 +129,19 @@ class SpriteSheetProcessor(QObject):
                 return None
             bboxes.append(bbox)
 
-        max_w = max(b.width() for b in bboxes)
-        max_h = max(b.height() for b in bboxes)
+        # 全局坐标：所有帧中主体的最左/最右/最高/最低位置
+        g_x1 = min(b.left() for b in bboxes)
+        g_y1 = min(b.top() for b in bboxes)
+        g_x2 = max(b.left() + b.width() for b in bboxes)
+        g_y2 = max(b.top() + b.height() for b in bboxes)
+        global_rect = QRect(g_x1, g_y1, g_x2 - g_x1, g_y2 - g_y1)
 
-        frame_w, frame_h = self._calculate_adaptive_frame_size(max_w, max_h)
+        frame_w, frame_h = self._calculate_adaptive_frame_size(
+            global_rect.width(), global_rect.height())
 
         rendered = [
-            self._render_frame_from_bbox(f, b, max_w, max_h, frame_w, frame_h)
-            for f, b in zip(keyed_frames, bboxes)
+            self._render_global_crop(f, global_rect, frame_w, frame_h)
+            for f in keyed_frames
         ]
         return rendered
 
@@ -169,24 +174,23 @@ class SpriteSheetProcessor(QObject):
 
     def _find_subject_bounds(self, image):
         width, height = image.width(), image.height()
-        min_x, min_y = width, height
-        max_x, max_y = -1, -1
+        image = image.convertToFormat(QImage.Format.Format_ARGB32)
+        bpl = image.bytesPerLine()
+        raw = bytes(image.constBits())
+        arr = np.frombuffer(raw, dtype=np.uint8).reshape(height, bpl)
+        arr = arr[:, :width * 4].reshape(height, width, 4)
+        alpha = arr[:, :, 3]
 
-        for y in range(height):
-            for x in range(width):
-                if image.pixelColor(x, y).alpha() > 24:
-                    if x < min_x:
-                        min_x = x
-                    if y < min_y:
-                        min_y = y
-                    if x > max_x:
-                        max_x = x
-                    if y > max_y:
-                        max_y = y
+        mask = (alpha > 128).astype(np.uint8) * 255
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=2)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
 
-        if max_x < 0 or max_y < 0:
+        coords = cv2.findNonZero(mask)
+        if coords is None:
             return None
-        return QRect(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
+        x, y, w, h = cv2.boundingRect(coords)
+        return QRect(x, y, w, h)
 
     def _remove_green_screen(self, image):
         image = image.convertToFormat(QImage.Format.Format_ARGB32)
@@ -313,27 +317,15 @@ class SpriteSheetProcessor(QObject):
             fw = max(MIN_FRAME_DIM, round(DEFAULT_FRAME_HEIGHT * aspect))
         return fw, fh
 
-    def _render_frame_from_bbox(self, image, bbox, max_width, max_height, frame_w, frame_h):
-        action_box = QImage(max_width, max_height, QImage.Format.Format_ARGB32)
-        action_box.fill(QColor(0, 0, 0, 0))
-
-        crop = image.copy(bbox)
-        painter = QPainter(action_box)
-        painter.drawImage(
-            (max_width - crop.width()) // 2,
-            max_height - crop.height(),
-            crop,
-        )
-        painter.end()
-
-        scaled = action_box.scaled(
+    def _render_global_crop(self, image, global_rect, frame_w, frame_h):
+        crop = image.copy(global_rect)
+        scaled = crop.scaled(
             frame_w, frame_h,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
         frame = QImage(frame_w, frame_h, QImage.Format.Format_ARGB32_Premultiplied)
         frame.fill(Qt.GlobalColor.transparent)
-
         painter = QPainter(frame)
         painter.drawImage(
             (frame_w - scaled.width()) // 2,

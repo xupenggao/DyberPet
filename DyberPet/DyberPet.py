@@ -444,6 +444,12 @@ class PetWidget(QWidget):
         self.active_window_phase_timer = QElapsedTimer()
         self.active_window_phase_duration = 0
 
+        # 定期将桌宠提到最前，防止被其他窗口覆盖
+        self._topmost_timer = QTimer(self)
+        self._topmost_timer.setInterval(5000)
+        self._topmost_timer.timeout.connect(self._ensure_topmost)
+        self._topmost_timer.start()
+
         self._init_ui()
         self._init_widget()
         self.init_conf(self.curr_pet_name) # if curr_pet_name else self.pets[0])
@@ -680,6 +686,9 @@ class PetWidget(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.show()
 
+    def _ensure_topmost(self):
+        if settings.on_top_hint:
+            self.raise_()
 
     def _init_ui(self):
         # The Character ----------------------------------------------------------------------------

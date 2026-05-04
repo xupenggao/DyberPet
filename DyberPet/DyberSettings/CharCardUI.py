@@ -460,8 +460,15 @@ For most of time, App can import the character for you automatically. But in any
         for i, charCard in enumerate(self.CharCardList):
             if charCard:
                 charCard.setParent(None)
-        for line in self.CharLineList:
-            line.setParent(None)
+
+        card_layout = self.CharCardGroup.cardLayout
+        while card_layout.count():
+            item = card_layout.takeAt(0)
+            if not item:
+                continue
+            widget = item.widget() if callable(getattr(item, 'widget', None)) else item
+            if widget and hasattr(widget, 'setParent'):
+                widget.setParent(None)
 
         self.expandLayout.removeWidget(self.CharCardGroup)
         self.CharCardGroup.setParent(None)
