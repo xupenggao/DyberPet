@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import ctypes
 from sys import platform
@@ -8,9 +9,24 @@ from PySide6.QtGui import QImage, QPixmap
 from DyberPet.conf import PetData, TaskData, ActData, ItemData
 from PySide6 import QtCore
 
-if platform == 'win32':
+if getattr(sys, 'frozen', False):
+    basedir = os.path.join(os.path.expanduser('~'), 'DyberPet')
+    BASEDIR = basedir
+    if not os.path.exists(basedir):
+        os.makedirs(basedir, exist_ok=True)
+    # Copy bundled res/ to user DyberPet directory on first run
+    import shutil
+    _res_dst = os.path.join(basedir, 'res')
+    _res_src = os.path.join(sys._MEIPASS, 'res')
+    if not os.path.exists(_res_dst):
+        shutil.copytree(_res_src, _res_dst)
+    _dp_dst = os.path.join(basedir, 'DyberPet')
+    _dp_src = os.path.join(sys._MEIPASS, 'DyberPet')
+    if not os.path.exists(_dp_dst):
+        shutil.copytree(_dp_src, _dp_dst)
+elif platform == 'win32':
     basedir = ''
-    BASEDIR = ''
+    BASEDIR = basedir
 else:
     #from pathlib import Path
     basedir = os.path.dirname(__file__) #Path(os.path.dirname(__file__))
@@ -125,7 +141,7 @@ def init():
     dragspeedx,dragspeedy=0,0
     fixdragspeedx, fixdragspeedy = 1.0, 1.0
     fall_right = False
-    gravity = 0.1
+    gravity = 0.4
     prefall = 0
 
     global act_id, current_act, previous_act
@@ -224,7 +240,7 @@ def init_settings():
 
     global gravity, fixdragspeedx, fixdragspeedy, tunable_scale, scale_dict, volume, \
            language_code, on_top_hint, default_pet, defaultAct, themeColor, minipet_scale, \
-           toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window
+           toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, walk_only, act_speed
 
     # check json file integrity
     try:
@@ -315,7 +331,8 @@ def init_settings():
         #=====================================================
 
         # Walk on the active foreground window when possible
-        walk_on_active_window = data_params.get('walk_on_active_window', False)
+        walk_on_active_window = data_params.get('walk_on_active_window', True)
+        walk_only = data_params.get('walk_only', True)
         #=====================================================
 
         # AI Pet Creator API config
@@ -325,9 +342,13 @@ def init_settings():
         if ai_api_base == 'https://api.openai.com/v1':
             ai_api_base = 'https://ark.cn-beijing.volces.com/api/v3'
 
+        # Action speed overrides
+        global act_speed
+        act_speed = data_params.get('act_speed', {})
+
     else:
         fixdragspeedx, fixdragspeedy = 1.0, 1.0
-        gravity = 0.1
+        gravity = 0.4
         volume = 0.5
         language_code = QtCore.QLocale().name()
         on_top_hint = True
@@ -345,16 +366,18 @@ def init_settings():
         bubble_on = True
         usertag_dict = {}
         auto_lock = False
-        walk_on_active_window = False
+        walk_on_active_window = True
+        walk_only = True
         ai_api_key = ''
         ai_api_base = 'https://ark.cn-beijing.volces.com/api/v3'
+        act_speed = {}
     check_locale()
     save_settings()
 
 def save_settings():
     global file_path, set_fall, gravity, fixdragspeedx, fixdragspeedy, scale_dict, volume, \
            language_code, on_top_hint, default_pet, defaultAct, themeColor, minipet_scale, \
-           toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, ai_api_key, ai_api_base
+           toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, walk_only, ai_api_key, ai_api_base, act_speed
 
     data_js = {'gravity':gravity,
                'set_fall': set_fall,
@@ -373,8 +396,10 @@ def save_settings():
                'themeColor':themeColor,
                'auto_lock':auto_lock,
                'walk_on_active_window':walk_on_active_window,
+               'walk_only':walk_only,
                'ai_api_key':ai_api_key,
-               'ai_api_base':ai_api_base
+               'ai_api_base':ai_api_base,
+               'act_speed':act_speed
                }
 
     with open(file_path, 'w', encoding='utf-8') as f:

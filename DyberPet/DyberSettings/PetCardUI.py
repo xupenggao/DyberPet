@@ -65,10 +65,11 @@ class PetInterface(ScrollArea):
 
         # HyperLink to pet collection (website not implemented yet)
         self.CharListLink = HyperlinkButton(
-                                            settings.PETCOLLECT_LINK, 
-                                            self.tr('Collected Mini-Pets'), 
+                                            settings.PETCOLLECT_LINK,
+                                            self.tr('Collected Mini-Pets'),
                                             self, FIF.LINK)
         self.CharListLink.setSizePolicy(QSizePolicy.Maximum, self.CharListLink.sizePolicy().verticalPolicy())
+        self.CharListLink.hide()
 
         # Button to add chars from local file
         self.addButton = PushButton(self.tr("Add Mini-Pets"), self, FIF.ADD)

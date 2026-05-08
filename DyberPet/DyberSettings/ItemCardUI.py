@@ -66,10 +66,11 @@ class ItemInterface(ScrollArea):
 
         # HyperLink to character collection (website not implemented yet)
         self.ItemListLink = HyperlinkButton(
-                                            settings.ITEMCOLLECT_LINK, 
-                                            self.tr('Collected Item MOD'), 
+                                            settings.ITEMCOLLECT_LINK,
+                                            self.tr('Collected Item MOD'),
                                             self, FIF.LINK)
         self.ItemListLink.setSizePolicy(QSizePolicy.Maximum, self.ItemListLink.sizePolicy().verticalPolicy())
+        self.ItemListLink.hide()
 
         # Button to add chars from local file
         self.addButton = PushButton(self.tr("Add Items"), self, FIF.ADD)

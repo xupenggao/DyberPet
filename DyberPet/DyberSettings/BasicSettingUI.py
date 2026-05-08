@@ -83,7 +83,7 @@ class SettingInterface(ScrollArea):
         self.WalkOnWindowCard = SwitchSettingCard(
             QIcon(os.path.join(basedir, 'res/icons/system/gravity.svg')),
             self.tr("前台窗口巡游"),
-            self.tr("Pet occasionally walks on top of the current foreground window and then returns"),
+            self.tr("桌宠偶尔会走到当前前台窗口上方活动，然后返回原位"),
             parent=self.ModeGroup
         )
         if settings.walk_on_active_window:
@@ -93,6 +93,21 @@ class SettingInterface(ScrollArea):
         self.WalkOnWindowCard.switchButton.checkedChanged.connect(self._WalkOnWindowChanged)
         if platform not in ['win32', 'darwin']:
             self.WalkOnWindowCard.switchButton.indicator.setEnabled(False)
+
+        # Walk only (no idle actions during window excursion)
+        self.WalkOnlyCard = SwitchSettingCard(
+            QIcon(os.path.join(basedir, 'res/icons/system/gravity.svg')),
+            self.tr("仅步行"),
+            self.tr("开启后桌宠在前台窗口上方时只进行步行动作，不穿插随机动作"),
+            parent=self.ModeGroup
+        )
+        if settings.walk_only:
+            self.WalkOnlyCard.setChecked(True)
+        else:
+            self.WalkOnlyCard.setChecked(False)
+        self.WalkOnlyCard.switchButton.checkedChanged.connect(self._WalkOnlyChanged)
+        if not settings.walk_on_active_window:
+            self.WalkOnlyCard.switchButton.indicator.setEnabled(False)
 
         # Auto-Lock
         self.AutoLockCard = SwitchSettingCard(
@@ -215,34 +230,6 @@ class SettingInterface(ScrollArea):
         )
         self.themeColorCard.colorChanged.connect(self.colorChanged)
 
-        # About ==============================================================================
-        self.aboutGroup = SettingCardGroup(self.tr('About'), self.scrollWidget)
-        update_needed, update_text = self._checkUpdate()
-        settings.UPDATE_NEEDED = update_needed
-        self.aboutCard = HyperlinkCard(
-            settings.RELEASE_URL,
-            self.tr('Release Website'),
-            QIcon(os.path.join(basedir, 'res/icons/system/update.svg')),
-            self.tr('Check Updates'),
-            update_text, #self.tr('Check update and learn more about the project on our GitHub page'),
-            self.aboutGroup
-        )
-        self.helpCard = HyperlinkCard(
-            settings.HELP_URL,
-            self.tr('Issue Page'),
-            FIF.HELP,
-            self.tr('Help & Issue'),
-            self.tr('Post your issue or question on our GitHub Issue, or contact us on BiliBili'),
-            self.aboutGroup
-        )
-        self.devCard = HyperlinkCard(
-            settings.DEVDOC_URL,
-            self.tr('Developer Document'),
-            QIcon(os.path.join(basedir, 'res/icons/system/document.svg')),
-            self.tr('Re-development'),
-            self.tr('If you want to develop your own pet/item/actions... Check here'),
-            self.aboutGroup
-        )
 
 
         self.__initWidget()
@@ -269,6 +256,7 @@ class SettingInterface(ScrollArea):
         self.ModeGroup.addSettingCard(self.AlwaysOnTopCard)
         self.ModeGroup.addSettingCard(self.AllowDropCard)
         self.ModeGroup.addSettingCard(self.WalkOnWindowCard)
+        self.ModeGroup.addSettingCard(self.WalkOnlyCard)
         self.ModeGroup.addSettingCard(self.AutoLockCard)
 
         self.InteractionGroup.addSettingCard(self.GravityCard)
@@ -283,10 +271,6 @@ class SettingInterface(ScrollArea):
         self.PersonalGroup.addSettingCard(self.languageCard)
         self.PersonalGroup.addSettingCard(self.themeColorCard)
 
-        self.aboutGroup.addSettingCard(self.aboutCard)
-        self.aboutGroup.addSettingCard(self.helpCard)
-        self.aboutGroup.addSettingCard(self.devCard)
-
         # add setting card group to layout
         self.expandLayout.setSpacing(28)
         self.expandLayout.setContentsMargins(60, 10, 60, 0)
@@ -295,7 +279,6 @@ class SettingInterface(ScrollArea):
         self.expandLayout.addWidget(self.InteractionGroup)
         self.expandLayout.addWidget(self.VolumnGroup)
         self.expandLayout.addWidget(self.PersonalGroup)
-        self.expandLayout.addWidget(self.aboutGroup)
 
     def __setQss(self):
         """ set style sheet """
@@ -329,10 +312,19 @@ class SettingInterface(ScrollArea):
             if not settings.on_top_hint:
                 settings.on_top_hint = True
                 self.AlwaysOnTopCard.setChecked(True)
+            self.WalkOnlyCard.switchButton.indicator.setEnabled(True)
         else:
             settings.walk_on_active_window = False
+            self.WalkOnlyCard.switchButton.indicator.setEnabled(False)
         settings.save_settings()
         self.walk_on_window_changed.emit()
+
+    def _WalkOnlyChanged(self, isChecked):
+        if isChecked:
+            settings.walk_only = True
+        else:
+            settings.walk_only = False
+        settings.save_settings()
 
     def _AutoLockChanged(self, isChecked):
         if isChecked:

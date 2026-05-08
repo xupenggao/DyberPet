@@ -65,10 +65,11 @@ class CharInterface(ScrollArea):
 
         # HyperLink to character collection (website not implemented yet)
         self.CharListLink = HyperlinkButton(
-                                            settings.CHARCOLLECT_LINK, 
-                                            self.tr('Collected Characters'), 
+                                            settings.CHARCOLLECT_LINK,
+                                            self.tr('Collected Characters'),
                                             self, FIF.LINK)
         self.CharListLink.setSizePolicy(QSizePolicy.Maximum, self.CharListLink.sizePolicy().verticalPolicy())
+        self.CharListLink.hide()
         
         # Button to add chars from local file
         self.addButton = PushButton(self.tr("Add Characters"), self, FIF.ADD)

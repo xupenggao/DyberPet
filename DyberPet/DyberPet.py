@@ -517,7 +517,9 @@ class PetWidget(QWidget):
             # 左键绑定拖拽
             self.is_follow_mouse = True
             self.mouse_drag_pos = event.globalPos() - self.pos()
-            
+
+            if self.active_window_excursion:
+                self.active_window_walk_timer.stop()
             if settings.onfloor == 0:
             # Left press activates Drag interaction
                 if settings.set_fall:              
@@ -574,13 +576,13 @@ class PetWidget(QWidget):
                 settings.mouseposy1=QCursor.pos().y()
 
             if settings.onfloor == 1:
+                if self.active_window_excursion:
+                    self._abandon_active_window_excursion()
                 if settings.set_fall:
                     settings.onfloor=0
                 settings.draging=1
                 self.workers['Animation'].pause()
                 self.workers['Interaction'].start_interact('mousedrag')
-            
-
             event.accept()
             #print(self.pos().x(), self.pos().y())
 
@@ -622,7 +624,7 @@ class PetWidget(QWidget):
                 if settings.set_fall:
                     settings.onfloor=0
                     settings.draging=0
-                    settings.prefall=1
+                    settings.prefall=0
 
                     settings.dragspeedx=(settings.mouseposx1-settings.mouseposx3)/2*settings.fixdragspeedx
                     settings.dragspeedy=(settings.mouseposy1-settings.mouseposy3)/2*settings.fixdragspeedy
@@ -641,6 +643,8 @@ class PetWidget(QWidget):
                     self.set_img()
                     self.workers['Animation'].resume()
             self.mouse_moving = False
+            if settings.walk_on_active_window and platform in ['win32', 'darwin']:
+                self._schedule_active_window_excursion()
 
 
     def _init_widget(self) -> None:
@@ -1145,7 +1149,9 @@ class PetWidget(QWidget):
         """
         if self.curr_pet_name == pet_name:
             return
-        
+
+        settings.default_pet = pet_name
+
         # close all accessory widgets (subpet, accessory animation, etc.)
         self.close_all_accs.emit()
 
@@ -1403,15 +1409,16 @@ class PetWidget(QWidget):
         self._sync_floor_pos()
 
         left_limit, right_limit, _, floor_pos = self._movement_limits()
-        if right_limit <= left_limit:
+        if right_limit < left_limit:
             self._finish_active_window_excursion()
             return
-        center_min = left_limit + self.width() // 2
-        center_max = right_limit - self.width() // 2
-        if center_max <= center_min:
-            center_min, center_max = left_limit, right_limit
-        center_x = random.randint(int(center_min), int(center_max))
-        self.move(center_x - self.width() // 2, floor_pos + settings.current_anchor[1])
+        center_x = random.randint(int(left_limit), int(right_limit))
+        screen_top = self.current_screen.topLeft().y()
+        if floor_pos <= screen_top:
+            init_y = screen_top - (self.height() - self.label.height())
+        else:
+            init_y = floor_pos + settings.current_anchor[1]
+        self.move(center_x - self.width() // 2, init_y)
 
         if 'Interaction' in self.workers:
             self.workers['Interaction'].stop_interact()
@@ -1424,7 +1431,10 @@ class PetWidget(QWidget):
 
     def _set_active_window_phase(self, mode=None):
         if mode is None:
-            mode = 'idle' if self.active_window_mode == 'walk' and random.random() < 0.45 else 'walk'
+            if settings.walk_only:
+                mode = 'walk'
+            else:
+                mode = 'idle' if self.active_window_mode == 'walk' and random.random() < 0.45 else 'walk'
         self.active_window_mode = mode
         self.active_window_act_frame = 0
         self.active_window_walk_frame = 0
@@ -1445,6 +1455,19 @@ class PetWidget(QWidget):
         if surface.handle:
             return surface.handle
         return surface.owner
+
+    def _abandon_active_window_excursion(self):
+        """Stop excursion and clean up state without returning home."""
+        self.active_window_walk_timer.stop()
+        self.active_window_timer.stop()
+        self.active_window_excursion = False
+        self.active_window_home_state = None
+        self.active_window_surface = None
+        self.active_window_surface_key = None
+        self.active_window_miss_count = 0
+        self.active_window_mode = 'walk'
+        self.active_window_act_frame = 0
+        self.active_window_walk_frame = 0
 
     def _finish_active_window_excursion(self, reschedule=True):
         self.active_window_walk_timer.stop()
@@ -1493,6 +1516,7 @@ class PetWidget(QWidget):
             return
 
         act = self._active_window_walk_act(self.active_window_walk_direction)
+        speed_mult, move_mult = self._get_act_speed_mult(act.act_name)
         if act.images:
             settings.previous_img = settings.current_img
             settings.current_img = act.images[self.active_window_walk_frame % len(act.images)]
@@ -1501,12 +1525,16 @@ class PetWidget(QWidget):
             self.active_window_walk_frame += 1
             self.set_img()
 
-        frame_move = abs(getattr(act, 'frame_move', 0) or 0)
+        frame_move = abs(getattr(act, 'frame_move', 0) or 0) * move_mult
         if frame_move <= 0:
             frame_move = max(3, int(6 * settings.tunable_scale))
 
         new_x = self.pos().x() + self.active_window_walk_direction * frame_move
-        new_y = self.floor_pos + settings.current_anchor[1]
+        screen_top = self.current_screen.topLeft().y()
+        if self.floor_pos <= screen_top:
+            new_y = screen_top - (self.height() - self.label.height())
+        else:
+            new_y = self.floor_pos + settings.current_anchor[1]
         left_limit, right_limit, _, _ = self._movement_limits()
         center_x = new_x + self.width() // 2
         if center_x <= left_limit or center_x >= right_limit:
@@ -1514,19 +1542,30 @@ class PetWidget(QWidget):
             self.active_window_walk_frame = 0
             new_x = self.pos().x() + self.active_window_walk_direction * frame_move
         self._move_customized(new_x - self.pos().x(), new_y - self.pos().y())
-        self.active_window_walk_timer.start(max(60, int(act.frame_refresh * 1000)))
+        self.active_window_walk_timer.start(max(60, int(act.frame_refresh / speed_mult * 1000)))
 
     def _active_window_idle_step(self):
         act = self._active_window_idle_act()
+        speed_mult, _ = self._get_act_speed_mult(act.act_name)
         if act.images:
+            total_frames = len(act.images) * act.act_num
+            if self.active_window_act_frame < total_frames:
+                idx = self.active_window_act_frame % len(act.images)
+            else:
+                idx = len(act.images) - 1
             settings.previous_img = settings.current_img
-            settings.current_img = act.images[self.active_window_act_frame % len(act.images)]
+            settings.current_img = act.images[idx]
             settings.previous_anchor = settings.current_anchor
             settings.current_anchor = [int(i*settings.tunable_scale) for i in act.anchor]
             self.active_window_act_frame += 1
             self.set_img()
-        self._move_customized(0, self.floor_pos + settings.current_anchor[1] - self.pos().y())
-        self.active_window_walk_timer.start(max(120, int(act.frame_refresh * 1000)))
+        screen_top = self.current_screen.topLeft().y()
+        if self.floor_pos <= screen_top:
+            target_y = screen_top - (self.height() - self.label.height())
+        else:
+            target_y = self.floor_pos + settings.current_anchor[1]
+        self._move_customized(0, target_y - self.pos().y())
+        self.active_window_walk_timer.start(max(120, int(act.frame_refresh / speed_mult * 1000)))
 
     def _active_window_walk_act(self, direction):
         if direction >= 0:
@@ -1558,6 +1597,14 @@ class PetWidget(QWidget):
             if act_name == 'sleep':
                 self.active_window_phase_duration = 20000
         return self.active_window_idle_current_act
+
+    def _get_act_speed_mult(self, act_name):
+        """获取当前角色某动作的速度倍率"""
+        if act_name is None:
+            return 1.0, 1.0
+        pet_speeds = settings.act_speed.get(settings.petname, {})
+        act_speeds = pet_speeds.get(act_name, {})
+        return act_speeds.get('speed', 1.0), act_speeds.get('move', 1.0)
 
     def _poll_active_window_surface(self):
         if not settings.walk_on_active_window or not self.active_window_excursion:
@@ -1600,10 +1647,10 @@ class PetWidget(QWidget):
             surface = self.active_window_surface
             left = max(screen_left, surface.left)
             right = min(screen_right, surface.right)
-            visible_floor = screen_top + self.label.height() // 2 - self.height()
+            visible_floor = screen_top
             floor_pos = max(surface.top - self.height(), visible_floor)
-            if right - left >= max(80, self.width() // 2):
-                return left, right, screen_top, floor_pos
+            if right - left >= self.width():
+                return left + self.width() // 2, right - self.width() // 2, screen_top, floor_pos
 
         return screen_left, screen_right, screen_top, floor_pos
 
@@ -2254,6 +2301,13 @@ class PetWidget(QWidget):
         # 正在做动作的情况，局限在当前屏幕内
         else:
             new_x, new_y = self.limit_in_screen(new_x, new_y, on_action=True)
+
+        # 窗口巡游时，确保桌宠 label 不溢出屏幕上沿
+        if self._active_surface_enabled():
+            screen_top = self.current_screen.topLeft().y()
+            label_top_limit = screen_top - (self.height() - self.label.height())
+            if new_y < label_top_limit:
+                new_y = label_top_limit
 
         self.move(new_x, new_y)
 
