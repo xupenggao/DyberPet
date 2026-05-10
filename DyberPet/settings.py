@@ -9,31 +9,15 @@ from PySide6.QtGui import QImage, QPixmap
 from DyberPet.conf import PetData, TaskData, ActData, ItemData
 from PySide6 import QtCore
 
-if getattr(sys, 'frozen', False):
-    basedir = os.path.join(os.path.expanduser('~'), 'DyberPet')
-    BASEDIR = basedir
-    if not os.path.exists(basedir):
-        os.makedirs(basedir, exist_ok=True)
-    # Copy bundled res/ to user DyberPet directory on first run
-    import shutil
-    _res_dst = os.path.join(basedir, 'res')
-    _res_src = os.path.join(sys._MEIPASS, 'res')
-    if not os.path.exists(_res_dst):
-        shutil.copytree(_res_src, _res_dst)
-    _dp_dst = os.path.join(basedir, 'DyberPet')
-    _dp_src = os.path.join(sys._MEIPASS, 'DyberPet')
-    if not os.path.exists(_dp_dst):
-        shutil.copytree(_dp_src, _dp_dst)
-elif platform == 'win32':
-    basedir = ''
-    BASEDIR = basedir
-else:
-    #from pathlib import Path
-    basedir = os.path.dirname(__file__) #Path(os.path.dirname(__file__))
-    #basedir = basedir.parent
-    basedir = basedir.replace('\\','/')
-    basedir = '/'.join(basedir.split('/')[:-1])
-    BASEDIR = basedir
+basedir = getattr(sys, '_dyberpet_basedir', None)
+if basedir is None:
+    if platform == 'win32':
+        basedir = ''
+    else:
+        basedir = os.path.dirname(__file__)
+        basedir = basedir.replace('\\','/')
+        basedir = '/'.join(basedir.split('/')[:-1])
+BASEDIR = basedir
 
 if platform == 'linux':
     configdir = os.path.dirname(os.environ['HOME']+'/.config/DyberPet/DyberPet')
@@ -105,11 +89,9 @@ ITEM_BDC = '#B1C790'
 SPEED_DECAY = 0.5
 AUTOFEED_THRESHOLD = 60
 
-def init():
-    # computer system ==================================================
-    global platform
-    platform = platform
+SYSTEM_PETS = ["Kitty", "ChrisKitty"]
 
+def init():
     # check if data directory exists ===================================
     newpath = os.path.join(configdir, 'data')
     if not os.path.exists(newpath):

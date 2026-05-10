@@ -1,8 +1,19 @@
 ﻿import sys
 from sys import platform
 import ctypes
-from tendo import singleton
 import os
+
+# Compute basedir in main module (where Nuitka sets __compiled__)
+# and share with all submodules via sys._dyberpet_basedir
+if "__compiled__" in globals():
+    sys._dyberpet_basedir = os.path.dirname(os.path.abspath(sys.argv[0]))
+elif platform == 'win32':
+    sys._dyberpet_basedir = ''
+else:
+    _bd = os.path.dirname(os.path.abspath(__file__))
+    sys._dyberpet_basedir = '/'.join(_bd.replace('\\','/').split('/')[:-1])
+
+from tendo import singleton
 from DyberPet.utils import read_json
 from DyberPet.DyberPet import PetWidget
 from DyberPet.Notification import DPNote
@@ -94,6 +105,7 @@ class DyberPetApp(QApplication):
         self.p.move_sig.connect(self.acc.send_main_movement)
         self.p.move_sig.connect(self.note.send_main_movement)
         self.p.close_all_accs.connect(self.acc.closeAll)
+        self.p.excursion_changed.connect(self.acc.start_excursion)
 
         # System Widgets - others
         self.conp.settingInterface.ontop_changed.connect(self.acc.ontop_changed)
@@ -106,6 +118,7 @@ class DyberPetApp(QApplication):
         self.p.change_note.connect(self.conp.settingInterface._update_scale)
 
         self.conp.charCardInterface.change_pet.connect(self.p._change_pet)
+        self.conp.charCardInterface.pet_deleted.connect(self.conp.settingInterface.refresh_default_pet)
         self.p.show_controlPanel.connect(self.conp.show_window)
 
         self.conp.gamesaveInterface.refresh_pet.connect(self.p.refresh_pet)
@@ -196,11 +209,6 @@ class DyberPetApp(QApplication):
 
         
 
-
-if platform == 'win32':
-    basedir = ''
-else:
-    basedir = os.path.dirname(__file__)
 
 if __name__ == '__main__':
 

@@ -1,4 +1,5 @@
 import re
+import sys
 import json
 import glob
 import time
@@ -12,14 +13,14 @@ from PySide6.QtGui import QImage, QPixmap
 
 from .utils import get_file_time, find_dir_with_subdir, convert_fv_versions
 
-if platform == 'win32':
-    basedir = ''
-else:
-    #from pathlib import Path
-    basedir = os.path.dirname(__file__) #Path(os.path.dirname(__file__))
-    #basedir = basedir.parent
-    basedir = basedir.replace('\\','/')
-    basedir = '/'.join(basedir.split('/')[:-1])
+basedir = getattr(sys, '_dyberpet_basedir', None)
+if basedir is None:
+    if platform == 'win32':
+        basedir = ''
+    else:
+        basedir = os.path.dirname(__file__)
+        basedir = basedir.replace('\\','/')
+        basedir = '/'.join(basedir.split('/')[:-1])
 
 
 if platform == 'linux':
@@ -475,7 +476,7 @@ def CheckCharFiles(folder):
 
 
 class Act:
-    def __init__(self, images=(), act_name=None, act_num=1, need_move=False, direction=None, frame_move=10, frame_refresh=0.04, anchor=[0,0]):
+    def __init__(self, images=(), act_name=None, act_num=1, need_move=False, direction=None, frame_move=10, frame_refresh=0.04, anchor=[0,0], hold_frame=0):
         """
         动作
         :param images: 动作图像
@@ -484,6 +485,7 @@ class Act:
         :param direction: 移动方向
         :param frame_move 单帧移动距离
         :param frame_refresh 单帧刷新时间
+        :param hold_frame 最后一帧停留秒数
         """
         self.images = images
         self.act_name = act_name
@@ -493,6 +495,7 @@ class Act:
         self.frame_move = frame_move
         self.frame_refresh = frame_refresh
         self.anchor = anchor
+        self.hold_frame = hold_frame
 
     @classmethod
     def init_act(cls, conf_param, pic_dict, scale, pet_name, resFolder='role', act_name=None):
@@ -521,12 +524,13 @@ class Act:
         frame_move = conf_param.get('frame_move', 10) * scale
         frame_refresh = conf_param.get('frame_refresh', 0.5)
         anchor = conf_param.get('anchor', [0,0])
-        return Act(img, act_name, act_num, need_move, direction, frame_move, frame_refresh, anchor)
+        hold_frame = conf_param.get('hold_frame', 0)
+        return Act(img, act_name, act_num, need_move, direction, frame_move, frame_refresh, anchor, hold_frame)
     
     def customized_copy(self, start_idx, end_idx, num_rep):
         imgs = self.images * int(self.act_num)
         imgs = imgs[start_idx:end_idx]
-        return Act(imgs, self.act_name, num_rep, self.need_move, self.direction, self.frame_move, self.frame_refresh, self.anchor)
+        return Act(imgs, self.act_name, num_rep, self.need_move, self.direction, self.frame_move, self.frame_refresh, self.anchor, self.hold_frame)
 
 
 def tran_idx_img(start_idx: int, end_idx: int, pic_dict: dict) -> list:
@@ -552,6 +556,7 @@ class EmptyAct:
         self.frame_move = 0
         self.frame_refresh = frame_refresh
         self.anchor = [0,0]
+        self.hold_frame = 0
 
 
 
