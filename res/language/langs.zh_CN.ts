@@ -255,6 +255,51 @@ For most of time, App can import the character for you automatically. But in any
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
+    <message>
+        <location filename="../../DyberPet/DyberSettings/CharCardUI.py" line="220"/>
+        <source>System character cannot be deleted.</source>
+        <translation>系统角色无法删除。</translation>
+    </message>
+    <message>
+        <location filename="../../DyberPet/DyberSettings/CharCardUI.py" line="226"/>
+        <source>Current character cannot be deleted. Please switch to another character first.</source>
+        <translation>当前使用的角色无法删除，请先切换到其他角色。</translation>
+    </message>
+    <message>
+        <location filename="../../DyberPet/DyberSettings/CharCardUI.py" line="231"/>
+        <source>Delete Character</source>
+        <translation>删除角色</translation>
+    </message>
+    <message>
+        <location filename="../../DyberPet/DyberSettings/CharCardUI.py" line="232"/>
+        <source>Are you sure you want to delete character</source>
+        <translation>确定要删除角色</translation>
+    </message>
+    <message>
+        <location filename="../../DyberPet/DyberSettings/CharCardUI.py" line="237"/>
+        <source>Save Data</source>
+        <translation>存档数据</translation>
+    </message>
+    <message>
+        <location filename="../../DyberPet/DyberSettings/CharCardUI.py" line="238"/>
+        <source>Do you also want to delete the save data (HP, favorability, items, coins, etc.) for this character?</source>
+        <translation>是否同时删除该角色的存档数据（饱食度、好感度、物品、金币等）？</translation>
+    </message>
+    <message>
+        <location filename="../../DyberPet/DyberSettings/CharCardUI.py" line="239"/>
+        <source>Delete All</source>
+        <translation>全部删除</translation>
+    </message>
+    <message>
+        <location filename="../../DyberPet/DyberSettings/CharCardUI.py" line="239"/>
+        <source>Keep Save Data</source>
+        <translation>保留存档</translation>
+    </message>
+    <message>
+        <location filename="../../DyberPet/DyberSettings/CharCardUI.py" line="245"/>
+        <source>Failed to delete character folder: </source>
+        <translation>删除角色文件夹失败：</translation>
+    </message>
 </context>
 <context>
     <name>CharLine</name>

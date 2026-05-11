@@ -83,14 +83,21 @@ class SpriteSheetProcessor(QObject):
         self._cancelled = False
         results = {}
 
-        for action_name, video_path in videos.items():
+        for action_name, video_info in videos.items():
             if self._cancelled:
                 self.processing_error.emit("用户已取消")
                 return
 
+            if isinstance(video_info, dict):
+                video_path = video_info["path"]
+                anim_type = video_info.get("anim_type", "loop")
+            else:
+                video_path = video_info
+                anim_type = "loop"
+
             self.progress_updated.emit(action_name, "processing")
 
-            frames = self._process_video(video_path, action_name)
+            frames = self._process_video(video_path, action_name, anim_type)
             if frames is None:
                 return
 
@@ -104,7 +111,7 @@ class SpriteSheetProcessor(QObject):
         if not self._cancelled:
             self.processing_complete.emit(results)
 
-    def _process_video(self, video_path, action_name):
+    def _process_video(self, video_path, action_name, anim_type="loop"):
         from tools.loop_maker.video_io import extract_frames
 
         frames, _ = extract_frames(video_path, target_fps=12)
@@ -112,7 +119,10 @@ class SpriteSheetProcessor(QObject):
             self.processing_error.emit(f"无法从视频中提取帧：{video_path}")
             return None
 
-        segment = self._find_loop(frames)
+        if anim_type == "loop":
+            segment = self._find_loop(frames)
+        else:
+            segment = self._extract_oneshot(frames)
 
         keyed_frames = []
         for rgb in segment:
@@ -164,6 +174,14 @@ class SpriteSheetProcessor(QObject):
         except Exception:
             pass
 
+        target = max(self.MIN_OUTPUT_FRAMES, NUM_EXTRACT_FRAMES)
+        if n <= target:
+            return list(frames)
+        indices = [int(i * (n - 1) / (target - 1)) for i in range(target)]
+        return [frames[i] for i in indices]
+
+    def _extract_oneshot(self, frames):
+        n = len(frames)
         target = max(self.MIN_OUTPUT_FRAMES, NUM_EXTRACT_FRAMES)
         if n <= target:
             return list(frames)
@@ -355,7 +373,7 @@ class PetFileBuilder:
         return True, name
 
     @staticmethod
-    def build_pet_folder(pet_name, sprites, target_dir):
+    def build_pet_folder(pet_name, sprites, target_dir, anim_types=None):
         ok, result = PetFileBuilder.validate_pet_name(pet_name)
         if not ok:
             raise ValueError(result)
@@ -399,7 +417,7 @@ class PetFileBuilder:
             with open(os.path.join(build_dir, "pet_conf.json"), "w", encoding="utf-8") as f:
                 json.dump(pet_conf, f, indent=2, ensure_ascii=False)
 
-            act_conf = PetFileBuilder._generate_act_conf(sprites)
+            act_conf = PetFileBuilder._generate_act_conf(sprites, anim_types)
             with open(os.path.join(build_dir, "act_conf.json"), "w", encoding="utf-8") as f:
                 json.dump(act_conf, f, indent=2, ensure_ascii=False)
 
@@ -489,11 +507,17 @@ class PetFileBuilder:
         return conf
 
     @staticmethod
-    def _generate_act_conf(sprites):
+    def _generate_act_conf(sprites, anim_types=None):
+        if anim_types is None:
+            anim_types = {}
+
+        def _act_num(action):
+            return 5 if anim_types.get(action, "loop") == "loop" else 1
+
         conf = {
             "default": {
                 "images": "stand",
-                "act_num": 1,
+                "act_num": _act_num("stand"),
                 "frame_refresh": 0.13,
             },
         }
@@ -501,7 +525,7 @@ class PetFileBuilder:
         if "leftwalk" in sprites:
             conf["left_walk"] = {
                 "images": "leftwalk",
-                "act_num": 1,
+                "act_num": _act_num("leftwalk"),
                 "need_move": True,
                 "direction": "left",
                 "frame_move": 3,
@@ -511,7 +535,7 @@ class PetFileBuilder:
         if "rightwalk" in sprites:
             conf["right_walk"] = {
                 "images": "rightwalk",
-                "act_num": 1,
+                "act_num": _act_num("leftwalk"),
                 "need_move": True,
                 "direction": "right",
                 "frame_move": 3,
@@ -522,7 +546,7 @@ class PetFileBuilder:
             if action_name in sprites:
                 conf[action_name] = {
                     "images": action_name,
-                    "act_num": 1,
+                    "act_num": _act_num(action_name),
                     "frame_refresh": 0.11,
                 }
 
@@ -530,7 +554,7 @@ class PetFileBuilder:
             if action_name in sprites:
                 conf[action_name] = {
                     "images": action_name,
-                    "act_num": 1,
+                    "act_num": _act_num(action_name),
                     "frame_refresh": 0.08,
                 }
             else:

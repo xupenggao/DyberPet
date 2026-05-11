@@ -363,6 +363,7 @@ class PetWidget(QWidget):
     close_all_accs = Signal(name='close_all_accs')
 
     move_sig = Signal(int, int, name='move_sig')
+    excursion_changed = Signal(bool, int, int, int, int, name='excursion_changed')
     #acc_withdrawed = Signal(str, name='acc_withdrawed')
     send_positions = Signal(list, list, name='send_positions')
 
@@ -1401,6 +1402,7 @@ class PetWidget(QWidget):
         self.active_window_surface = surface
         self.active_window_surface_key = self._active_window_surface_key(surface)
         self.active_window_miss_count = 0
+        self.excursion_changed.emit(True, surface.left, surface.top, surface.right, surface.bottom)
         self.active_window_walk_direction = random.choice([-1, 1])
         self.active_window_walk_frame = 0
         self.active_window_act_frame = 0
@@ -1413,12 +1415,7 @@ class PetWidget(QWidget):
             self._finish_active_window_excursion()
             return
         center_x = random.randint(int(left_limit), int(right_limit))
-        screen_top = self.current_screen.topLeft().y()
-        if floor_pos <= screen_top:
-            init_y = screen_top - (self.height() - self.label.height())
-        else:
-            init_y = floor_pos + settings.current_anchor[1]
-        self.move(center_x - self.width() // 2, init_y)
+        self.move(center_x - self.width() // 2, floor_pos)
 
         if 'Interaction' in self.workers:
             self.workers['Interaction'].stop_interact()
@@ -1475,6 +1472,7 @@ class PetWidget(QWidget):
 
         home_state = self.active_window_home_state
         self.active_window_excursion = False
+        self.excursion_changed.emit(False, 0, 0, 0, 0)
         self.active_window_home_state = None
         self.active_window_surface = None
         self.active_window_surface_key = None
@@ -1530,11 +1528,7 @@ class PetWidget(QWidget):
             frame_move = max(3, int(6 * settings.tunable_scale))
 
         new_x = self.pos().x() + self.active_window_walk_direction * frame_move
-        screen_top = self.current_screen.topLeft().y()
-        if self.floor_pos <= screen_top:
-            new_y = screen_top - (self.height() - self.label.height())
-        else:
-            new_y = self.floor_pos + settings.current_anchor[1]
+        new_y = self.floor_pos
         left_limit, right_limit, _, _ = self._movement_limits()
         center_x = new_x + self.width() // 2
         if center_x <= left_limit or center_x >= right_limit:
@@ -1559,11 +1553,7 @@ class PetWidget(QWidget):
             settings.current_anchor = [int(i*settings.tunable_scale) for i in act.anchor]
             self.active_window_act_frame += 1
             self.set_img()
-        screen_top = self.current_screen.topLeft().y()
-        if self.floor_pos <= screen_top:
-            target_y = screen_top - (self.height() - self.label.height())
-        else:
-            target_y = self.floor_pos + settings.current_anchor[1]
+        target_y = self.floor_pos
         self._move_customized(0, target_y - self.pos().y())
         self.active_window_walk_timer.start(max(120, int(act.frame_refresh / speed_mult * 1000)))
 
@@ -1625,6 +1615,7 @@ class PetWidget(QWidget):
         self.active_window_surface = surface
         self._switch_screen_for_surface(surface)
         self._sync_floor_pos()
+        self.excursion_changed.emit(True, surface.left, surface.top, surface.right, surface.bottom)
 
     def _switch_screen_for_surface(self, surface):
         point = QPoint(surface.center_x, surface.center_y)
@@ -1647,8 +1638,10 @@ class PetWidget(QWidget):
             surface = self.active_window_surface
             left = max(screen_left, surface.left)
             right = min(screen_right, surface.right)
-            visible_floor = screen_top
-            floor_pos = max(surface.top - self.height(), visible_floor)
+            if surface.top >= screen_top + self.label.height():
+                floor_pos = surface.top - self.height()
+            else:
+                floor_pos = screen_top - (self.height() - self.label.height())
             if right - left >= self.width():
                 return left + self.width() // 2, right - self.width() // 2, screen_top, floor_pos
 

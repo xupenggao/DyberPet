@@ -1,0 +1,17 @@
+{
+    "greeting_1": {
+        "sound": "cat.wav"
+    },
+    "greeting_2": {
+        "sound": "cat.wav"
+    },
+    "greeting_3": {
+        "sound": "cat.wav"
+    },
+    "greeting_4": {
+        "sound": "cat.wav"
+    },
+    "greeting_5": {
+        "sound": "cat.wav"
+    }
+}

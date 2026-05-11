@@ -1,0 +1,33 @@
+{
+    "fall": {
+        "images": "fall",
+        "act_num": 1,
+        "frame_refresh": 0.05
+    },
+    "leftwalk": {
+        "images": "leftwalk",
+        "act_num": 1,
+        "frame_refresh": 0.05555555555555556,
+        "need_move": true,
+        "direction": "left",
+        "frame_move": 3.96
+    },
+    "stand": {
+        "images": "stand",
+        "act_num": 5,
+        "frame_refresh": 0.13
+    },
+    "rightwalk": {
+        "images": "rightwalk",
+        "act_num": 1,
+        "frame_refresh": 0.05555555555555556,
+        "need_move": true,
+        "direction": "right",
+        "frame_move": 3.99
+    },
+    "default": {
+        "images": "stand",
+        "act_num": 5,
+        "frame_refresh": 0.13
+    }
+}

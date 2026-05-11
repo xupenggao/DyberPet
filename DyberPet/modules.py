@@ -250,6 +250,8 @@ class Animation_worker(QObject):
                 time.sleep(act[0]/1000)
             return
 
+        speed_mult, move_mult = self._get_speed_mult(act.act_name)
+
         for i in range(act.act_num):
 
             #while self.is_paused:
@@ -277,11 +279,26 @@ class Animation_worker(QObject):
                 self.sig_setimg_anim.emit()
                 #time.sleep(act.frame_refresh) ######## sleep 和 move 是不是应该反过来？
                 #if act.need_move:
-                self._move(act) #self.pos(), act)
-                time.sleep(act.frame_refresh) 
+                self._move(act, move_mult) #self.pos(), act)
+                time.sleep(act.frame_refresh / speed_mult)
                 #else:
                 #    self._static_act(self.pos())
                 self.sig_repaint_anim.emit()
+
+        # Hold last frame for specified duration (e.g. sleep pose)
+        if act.hold_frame > 0 and not self.is_paused and not self.is_killed:
+            hold_remaining = act.hold_frame
+            while hold_remaining > 0 and not self.is_paused and not self.is_killed:
+                time.sleep(min(0.2, hold_remaining))
+                hold_remaining -= 0.2
+
+    def _get_speed_mult(self, act_name):
+        """获取当前角色某动作的速度倍率"""
+        if act_name is None:
+            return 1.0, 1.0
+        pet_speeds = settings.act_speed.get(settings.petname, {})
+        act_speeds = pet_speeds.get(act_name, {})
+        return act_speeds.get('speed', 1.0), act_speeds.get('move', 1.0)
     '''
     def _static_act(self, pos: QPoint) -> None:
         """
@@ -306,7 +323,7 @@ class Animation_worker(QObject):
         self.move(new_x, new_y)
     '''
 
-    def _move(self, act: QAction) -> None: #pos: QPoint, act: QAction) -> None:
+    def _move(self, act: QAction, move_mult=1.0) -> None: #pos: QPoint, act: QAction) -> None:
         """
         移动动作
         :param pos: 当前位置
@@ -317,20 +334,21 @@ class Animation_worker(QObject):
         plus_x = 0.
         plus_y = 0.
         direction = act.direction
+        frame_move = act.frame_move * move_mult
         if direction is None:
             pass
         else:
             if direction == 'right':
-                plus_x = act.frame_move
+                plus_x = frame_move
 
             if direction == 'left':
-                plus_x = -act.frame_move
+                plus_x = -frame_move
 
             if direction == 'up':
-                plus_y = -act.frame_move
+                plus_y = -frame_move
 
             if direction == 'down':
-                plus_y = act.frame_move
+                plus_y = frame_move
         if plus_x == 0 and plus_y == 0:
             pass
         else:
@@ -453,8 +471,7 @@ class Interaction_worker(QObject):
     def kill(self):
         self.is_paused = False
         self.is_killed = True
-        #self.timer.stop()
-        # terminate thread
+        self.timer.stop()
 
     def pause(self):
         self.is_paused = True
@@ -498,6 +515,10 @@ class Interaction_worker(QObject):
         else:
             n_repeat = math.ceil(act.frame_refresh / (self.pet_conf.interact_speed / 1000))
             img_list_expand = [item for item in act.images for i in range(n_repeat)] * act.act_num
+            if not img_list_expand:
+                return
+            if settings.playid >= len(img_list_expand):
+                settings.playid = 0
             img = img_list_expand[settings.playid]
 
             settings.playid += 1

@@ -57,6 +57,7 @@ SUBPET_MANAGER = SubPet_Manager()
 
 class DPAccessory(QWidget):
     send_main_movement = Signal(int, int, name="send_main_movement")
+    start_excursion = Signal(bool, int, int, int, int, name="start_excursion")
     ontop_changed = Signal(name='ontop_changed')
     reset_size_sig = Signal(name='reset_size_sig')
     acc_withdrawed = Signal(str, name='acc_withdrawed')
@@ -99,7 +100,8 @@ class DPAccessory(QWidget):
             self.acc_dict[acc_index].setup_acc.connect(self.setup_accessory)
             self.reset_size_sig.connect(self.acc_dict[acc_index].reset_size)
             self.send_main_movement.connect(self.acc_dict[acc_index].update_main_pos)
-        
+            self.start_excursion.connect(self.acc_dict[acc_index].on_excursion_changed)
+
         elif acc_act.get('name','') == 'subpet':
             if acc_act['pet_name'] in self.subpet_dict.keys():
                 # Mini-Pet already opened, so withdraw
@@ -120,6 +122,7 @@ class DPAccessory(QWidget):
                 self.acc_dict[acc_index].acc_withdrawed.connect(self.acc_withdrawed)
                 self.reset_size_sig.connect(self.acc_dict[acc_index].reset_size)
                 self.send_main_movement.connect(self.acc_dict[acc_index].update_main_pos)
+                self.start_excursion.connect(self.acc_dict[acc_index].on_excursion_changed)
                 self.subpet_dict[acc_act['pet_name']] = acc_index
                 #self.subpet_name = acc_act['pet_name']
                 #self.subpet_idx = acc_index
@@ -942,6 +945,12 @@ class SubPet(QWidget):
         self.pat_idx = len(settings.HP_TIERS)-1
         self.closing = False
 
+        # Excursion state
+        self.excursion_active = False
+        self.excursion_surface = None
+        self.excursion_home_pos = None
+        self.excursion_home_floor = None
+
         self.timer = QTimer()
         self.timer.setTimerType(Qt.PreciseTimer)
         self.timer.timeout.connect(self.animation)
@@ -1132,6 +1141,110 @@ class SubPet(QWidget):
                 self.follow_reached_screen_boundary = False
                 self.destination = [x_new, y_new]
 
+    def on_excursion_changed(self, active, left, top, right, bottom):
+        if active:
+            screen_top = self.current_screen.topLeft().y()
+            if top >= screen_top + self.label.height():
+                new_floor = top - self.height()
+            else:
+                new_floor = screen_top - (self.height() - self.label.height())
+
+            # Surface update while already on excursion — keep position, just update bounds
+            if self.excursion_active:
+                self.excursion_surface = (left, top, right, bottom)
+                self.floor_pos = new_floor
+                self.excursion_y = new_floor
+                left_limit = left + self.width() // 2
+                right_limit = right - self.width() // 2
+                if right_limit >= left_limit:
+                    center_x = self.pos().x() + self.width() // 2
+                    center_x = max(left_limit, min(right_limit, center_x))
+                    self.move(center_x - self.width() // 2, self.excursion_y)
+                return
+
+            # New excursion
+            self.excursion_active = True
+            self.excursion_surface = (left, top, right, bottom)
+            self.excursion_home_pos = QPoint(self.pos().x(), self.pos().y())
+            self.excursion_home_floor = self.floor_pos
+            self.floor_pos = new_floor
+            self.excursion_y = new_floor
+
+            if right - left < self.width():
+                self.excursion_active = False
+                return
+
+            left_limit = left + self.width() // 2
+            right_limit = right - self.width() // 2
+            center_x = random.randint(int(left_limit), int(right_limit))
+            self.move(center_x - self.width() // 2, self.excursion_y)
+            self.excursion_walk_dir = random.choice([-1, 1])
+            self.excursion_walk_frame = 0
+            self.playid = 0
+            self.current_act = None
+            if not hasattr(self, 'excursion_walk_timer'):
+                self.excursion_walk_timer = QTimer(self)
+                self.excursion_walk_timer.timeout.connect(self._excursion_walk_step)
+            act = self.pet_conf.right if self.excursion_walk_dir >= 0 else self.pet_conf.left
+            self.excursion_walk_timer.start(max(60, int(act.frame_refresh * 1000)))
+        else:
+            if not self.excursion_active:
+                return
+            self.excursion_active = False
+            self.excursion_surface = None
+            if hasattr(self, 'excursion_walk_timer') and self.excursion_walk_timer.isActive():
+                self.excursion_walk_timer.stop()
+            if self.excursion_home_floor is not None:
+                self.floor_pos = self.excursion_home_floor
+            # Restore default image and position
+            self.previous_img = self.current_img
+            self.current_img = self.pet_conf.default.images[0]
+            self.previous_anchor = self.current_anchor
+            self.current_anchor = [int(i * self.tunable_scale) for i in self.pet_conf.default.anchor]
+            self.set_img()
+            if self.excursion_home_pos is not None:
+                self.move(self.excursion_home_pos)
+            self.excursion_home_pos = None
+            self.excursion_home_floor = None
+
+    def _excursion_walk_step(self):
+        if not self.excursion_active or self.excursion_surface is None:
+            if hasattr(self, 'excursion_walk_timer'):
+                self.excursion_walk_timer.stop()
+            return
+
+        left, top, right, bottom = self.excursion_surface
+        left_limit = left + self.width() // 2
+        right_limit = right - self.width() // 2
+
+        self.move_right = self.excursion_walk_dir >= 0
+        act = self.pet_conf.right if self.move_right else self.pet_conf.left
+
+        # Save current visual center before set_img may change widget width
+        center_x = self.pos().x() + self.width() // 2
+
+        if act.images:
+            self.previous_img = self.current_img
+            self.current_img = act.images[self.excursion_walk_frame % len(act.images)]
+            self.previous_anchor = self.current_anchor
+            self.current_anchor = [int(i * self.tunable_scale) for i in act.anchor]
+            self.excursion_walk_frame += 1
+            self.set_img()
+
+        frame_move = abs(getattr(act, 'frame_move', 0) or 0)
+        if frame_move <= 0:
+            frame_move = max(3, int(6 * self.tunable_scale))
+
+        new_center = center_x + self.excursion_walk_dir * frame_move
+
+        if new_center <= left_limit or new_center >= right_limit:
+            self.excursion_walk_dir *= -1
+            self.excursion_walk_frame = 0
+            new_center = center_x + self.excursion_walk_dir * frame_move
+
+        self.move(new_center - self.width() // 2, self.excursion_y)
+        next_interval = max(60, int(act.frame_refresh * 1000))
+        self.excursion_walk_timer.start(next_interval)
 
     def _show_right_menu(self):
         """
@@ -1574,6 +1687,9 @@ class SubPet(QWidget):
 
     def animation(self):
 
+        if self.excursion_active:
+            return
+
         if self.follow_main:
             self._check_destination()
 
@@ -1692,7 +1808,11 @@ class SubPet(QWidget):
 
     def animat(self, act_name):
 
-        acts_index = self.pet_conf.act_name.index(act_name)
+        try:
+            acts_index = self.pet_conf.act_name.index(act_name)
+        except ValueError:
+            self.stop_interact()
+            return
 
         
         # 判断是否满足动作饱食度要求

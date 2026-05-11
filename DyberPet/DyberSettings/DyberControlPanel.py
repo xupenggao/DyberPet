@@ -14,6 +14,7 @@ from .CharCardUI import CharInterface
 from .ItemCardUI import ItemInterface
 from .PetCardUI import PetInterface
 from .AIPetCreator import AIPetInterface
+from .ActSpeedUI import ActSpeedInterface
 from sys import platform
 import DyberPet.settings as settings
 basedir = settings.BASEDIR
@@ -33,6 +34,8 @@ class ControlMainWindow(FluentWindow):
         self.itemCardInterface = ItemInterface(sizeHintDyber=(minWidth, minHeight), parent=self)
         self.petCardInterface = PetInterface(sizeHintDyber=(minWidth, minHeight), parent=self)
         self.aiPetInterface = AIPetInterface(sizeHintDyber=(minWidth, minHeight), parent=self)
+        self.aiPetInterface.hide()
+        self.actSpeedInterface = ActSpeedInterface(sizeHintDyber=(minWidth, minHeight), parent=self)
 
         self.initNavigation()
         self.setMinimumSize(minWidth, minHeight)
@@ -53,9 +56,12 @@ class ControlMainWindow(FluentWindow):
         self.addSubInterface(self.petCardInterface,
                              QIcon(os.path.join(basedir, "res/icons/system/minipet.svg")),
                              self.tr('Mini-Pets'))
-        self.addSubInterface(self.aiPetInterface,
-                             FIF.ROBOT,
-                             self.tr('自定义桌宠'))
+        # self.addSubInterface(self.aiPetInterface,
+        #                      FIF.ROBOT,
+        #                      self.tr('自定义桌宠'))
+        self.addSubInterface(self.actSpeedInterface,
+                             FIF.SPEED_HIGH,
+                             self.tr('动作速度'))
 
 
         self.navigationInterface.setExpandWidth(200)

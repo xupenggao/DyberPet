@@ -2,7 +2,7 @@
 import os
 import json
 from datetime import datetime
-from shutil import copytree
+from shutil import copytree, rmtree
 import subprocess
 
 from qfluentwidgets import (ScrollArea, ExpandLayout, SettingCardGroup, InfoBar, FlowLayout,
@@ -13,8 +13,8 @@ from qfluentwidgets import (ScrollArea, ExpandLayout, SettingCardGroup, InfoBar,
 from qfluentwidgets import FluentIcon as FIF
 
 from PySide6.QtCore import Qt, QThread, Signal, QUrl, QStandardPaths, QSize
-from PySide6.QtGui import QDesktopServices, QIcon, QFont
-from PySide6.QtWidgets import QWidget, QLabel, QApplication, QFileDialog, QSizePolicy, QHBoxLayout, QSpacerItem
+from PySide6.QtGui import QDesktopServices, QIcon, QFont, QPixmap
+from PySide6.QtWidgets import QWidget, QLabel, QApplication, QFileDialog, QSizePolicy, QHBoxLayout, QSpacerItem, QVBoxLayout, QDialog
 
 from .custom_utils import CharCard, CharCardGroup, CharLine
 from DyberPet.conf import CheckCharFiles
@@ -29,6 +29,7 @@ module_path = os.path.join(basedir, 'DyberPet/DyberSettings/')
 class CharInterface(ScrollArea):
     """ Character Management interface """
     change_pet = Signal(str, name='change_pet')
+    pet_deleted = Signal(name='pet_deleted')
 
     def __init__(self, sizeHintDyber, parent=None):
         super().__init__(parent=parent)
@@ -62,6 +63,10 @@ class CharInterface(ScrollArea):
         self.titleLayout.addWidget(self.panelHelp, Qt.AlignLeft | Qt.AlignVCenter)
         spacerItem2 = QSpacerItem(10, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         self.titleLayout.addItem(spacerItem2)
+
+        self.contactAuthorBtn = PushButton(self.tr("联系作者"), self, FIF.PEOPLE)
+        self.contactAuthorBtn.setSizePolicy(QSizePolicy.Maximum, self.contactAuthorBtn.sizePolicy().verticalPolicy())
+        self.titleLayout.addWidget(self.contactAuthorBtn, Qt.AlignRight | Qt.AlignVCenter)
 
         # HyperLink to character collection (website not implemented yet)
         self.CharListLink = HyperlinkButton(
@@ -173,6 +178,7 @@ class CharInterface(ScrollArea):
 
         self.addButton.clicked.connect(self.__onAddClicked)
         self.panelHelp.clicked.connect(self.__onShowInstruction)
+        self.contactAuthorBtn.clicked.connect(self.__onContactAuthor)
 
     def __onLaunchClicked(self, petname):
         # Ignore if it's current char
@@ -212,32 +218,91 @@ class CharInterface(ScrollArea):
             subprocess.call(["xdg-open", os.path.normpath(folder)])
 
     def __onDeleteClicked(self, cardIndex, folder):
-        # Judge if it is current pet
+        pet_name = os.path.basename(folder)
 
-        # Move file to trash bin
-
-        # Remove char from settings.pet
-
-        # Update basicSetting change pet
-
-        # Delete character List and Card
-        title = self.tr("Function incomplete")
-        content = self.tr("The function has not been implemented yet.\nCurrently, you can Go To Folder, delete the whole folder, and restart App.\nSorry for the inconvenience.")
-        #if not self.__showMessageBox(title, content):
-        #    return
-        yesText = self.tr("Go to Folder")
-        if self.__showMessageBox(title, content, yesText):
-            resFolder = os.path.join(basedir, 'res/role')
-
-            if platform == 'win32':
-                os.startfile(os.path.normpath(resFolder))
-            elif platform == "darwin":
-                subprocess.call(["open", os.path.normpath(resFolder)])
-            else:
-                # For Linux - not tested
-                subprocess.call(["xdg-open", os.path.normpath(resFolder)])
-        else:
+        # Check: system pet cannot be deleted
+        if pet_name in settings.SYSTEM_PETS:
+            content = self.tr("System character cannot be deleted.")
+            self.__showSystemNote(content, 2)
             return
+
+        # Check: current active pet cannot be deleted
+        if pet_name == settings.petname:
+            content = self.tr("Current character cannot be deleted. Please switch to another character first.")
+            self.__showSystemNote(content, 2)
+            return
+
+        # Confirmation: delete character
+        title = self.tr("Delete Character")
+        content = self.tr("Are you sure you want to delete character") + " " + pet_name + "?"
+        if not self.__showMessageBox(title, content):
+            return
+
+        # Ask whether to delete save data
+        title2 = self.tr("Save Data")
+        content2 = self.tr("Do you also want to delete the save data (HP, favorability, items, coins, etc.) for this character?")
+        delete_save = self.__showMessageBox(title2, content2, yesText=self.tr("Delete All"), cancelText=self.tr("Keep Save Data"))
+
+        # Delete character folder
+        try:
+            rmtree(folder)
+        except Exception as e:
+            content = self.tr("Failed to delete character folder: ") + str(e)
+            self.__showSystemNote(content, 2)
+            return
+
+        # Clean up save data
+        if delete_save:
+            if hasattr(settings, 'pet_data') and settings.pet_data:
+                settings.pet_data.allData_params.pop(pet_name, None)
+                settings.pet_data.save_data()
+
+        # Clean up settings
+        if pet_name in settings.pets:
+            settings.pets.remove(pet_name)
+        settings.defaultAct.pop(pet_name, None)
+        settings.scale_dict.pop(pet_name, None)
+        settings.usertag_dict.pop(pet_name, None)
+        settings.act_speed.pop(pet_name, None)
+        if hasattr(settings, 'act_data') and settings.act_data:
+            settings.act_data.allAct_params.pop(pet_name, None)
+        if settings.default_pet == pet_name:
+            settings.default_pet = settings.pets[0] if settings.pets else "Kitty"
+        settings.save_settings()
+
+        # Remove UI items
+        if cardIndex < len(self.CharLineList):
+            line_widget = self.CharLineList[cardIndex]
+            self.CharCardGroup.cardLayout.removeWidget(line_widget)
+            line_widget.setParent(None)
+            line_widget.deleteLater()
+
+        card_widget = self.CharCardList[cardIndex]
+        if card_widget:
+            card_widget.setParent(None)
+            card_widget.deleteLater()
+
+        self.CharLineList.pop(cardIndex)
+        self.CharCardList.pop(cardIndex)
+
+        # Re-index remaining items
+        for i, line in enumerate(self.CharLineList):
+            line.cardIndex = i
+        for i, card in enumerate(self.CharCardList):
+            if card and hasattr(card, 'card'):
+                card.card.cardIndex = i
+
+        # Reconnect signals
+        self.__connectSignalToSlot()
+
+        # Refresh card group layout size
+        self.CharCardGroup.adjustSize()
+
+        # Emit signal to refresh default pet combo in BasicSettingUI
+        self.pet_deleted.emit()
+
+        content = self.tr("Character deleted successfully!")
+        self.__showSystemNote(content, 0)
 
 
     def __onInfoClicked(self, cardIndex, pos):
@@ -425,6 +490,37 @@ For most of time, App can import the character for you automatically. But in any
                 subprocess.call(["xdg-open", os.path.normpath(resFolder)])
         else:
             return
+
+    def __onContactAuthor(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.tr("联系作者"))
+        dialog.setFixedSize(350, 400)
+
+        layout = QVBoxLayout(dialog)
+
+        titleLabel = QLabel(self.tr("微信二维码"))
+        titleLabel.setAlignment(Qt.AlignCenter)
+        setFont(titleLabel, 16, QFont.DemiBold)
+        layout.addWidget(titleLabel)
+
+        qrPath = os.path.join(basedir, 'res/img/IMG_9227.jpg')
+        pixmap = QPixmap(qrPath)
+        if not pixmap.isNull():
+            scaledPixmap = pixmap.scaled(250, 250, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            imgLabel = QLabel()
+            imgLabel.setPixmap(scaledPixmap)
+            imgLabel.setAlignment(Qt.AlignCenter)
+            layout.addWidget(imgLabel, 0, Qt.AlignCenter)
+
+            hintLabel = QLabel(self.tr("扫码添加微信"))
+            hintLabel.setAlignment(Qt.AlignCenter)
+            layout.addWidget(hintLabel)
+        else:
+            errorLabel = QLabel(self.tr("QR code image not found"))
+            errorLabel.setAlignment(Qt.AlignCenter)
+            layout.addWidget(errorLabel)
+
+        dialog.exec()
         
 
     def __showMessageBox(self, title, content, yesText='OK', cancelText=None):

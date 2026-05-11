@@ -13,7 +13,7 @@ from qfluentwidgets import (
     ScrollArea, PushButton, LineEdit,
     InfoBar, InfoBarPosition, FluentIcon as FIF,
     CardWidget, BodyLabel, SubtitleLabel, TitleLabel,
-    PrimaryPushButton, ProgressRing,
+    PrimaryPushButton, ProgressRing, ComboBox,
 )
 
 import DyberPet.settings as settings
@@ -46,6 +46,13 @@ ACTION_HINTS = {
     "leftwalk": "5秒绿幕视频（必填）",
 }
 
+DEFAULT_ANIM_TYPES = {
+    "stand": "loop", "leftwalk": "loop",
+    "sit": "oneshot", "lie": "oneshot", "sleep": "oneshot",
+    "patpat": "oneshot", "drag": "oneshot", "prefall": "oneshot",
+    "fall": "oneshot", "onfloor": "oneshot",
+}
+
 
 class VideoUploadCard(CardWidget):
     def __init__(self, action_name, parent=None):
@@ -53,6 +60,7 @@ class VideoUploadCard(CardWidget):
         self.action_name = action_name
         self.video_path = None
         self._is_required = action_name in REQUIRED_ACTIONS
+        self.anim_type = DEFAULT_ANIM_TYPES.get(action_name, "loop")
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)
@@ -85,6 +93,13 @@ class VideoUploadCard(CardWidget):
         self.preview_label.setAlignment(Qt.AlignCenter)
         self.preview_label.setStyleSheet("border: 1px dashed #ccc; border-radius: 4px;")
         layout.addWidget(self.preview_label)
+
+        self.anim_combo = ComboBox()
+        self.anim_combo.addItems(["循环", "一次性"])
+        self.anim_combo.setCurrentIndex(0 if self.anim_type == "loop" else 1)
+        self.anim_combo.setFixedWidth(72)
+        self.anim_combo.currentIndexChanged.connect(self._on_anim_type_changed)
+        layout.addWidget(self.anim_combo)
 
         self.btn_upload = PushButton("上传")
         self.btn_upload.setFixedWidth(80)
@@ -128,6 +143,9 @@ class VideoUploadCard(CardWidget):
         self.preview_label.clear()
         self.preview_label.setStyleSheet("border: 1px dashed #ccc; border-radius: 4px;")
         self.btn_clear.hide()
+
+    def _on_anim_type_changed(self, index):
+        self.anim_type = "loop" if index == 0 else "oneshot"
 
 
 class AIPetInterface(ScrollArea):
@@ -300,9 +318,14 @@ class AIPetInterface(ScrollArea):
                 return
 
             videos = {}
+            self._anim_types = {}
             for action_name, card in self.action_cards.items():
                 if card.video_path:
-                    videos[action_name] = card.video_path
+                    videos[action_name] = {
+                        "path": card.video_path,
+                        "anim_type": card.anim_type,
+                    }
+                    self._anim_types[action_name] = card.anim_type
 
             missing_required = [
                 ACTION_LABELS[a] for a in REQUIRED_ACTIONS if a not in videos
@@ -398,7 +421,9 @@ class AIPetInterface(ScrollArea):
             return
 
         try:
-            pet_dir = PetFileBuilder.build_pet_folder(pet_name, self._generated_sprites, target_dir)
+            pet_dir = PetFileBuilder.build_pet_folder(
+                pet_name, self._generated_sprites, target_dir,
+                anim_types=self._anim_types)
             stat_code, error_list = CheckCharFiles(pet_dir)
             if stat_code != 0:
                 detail = "" if error_list is None else ": " + ", ".join(error_list)

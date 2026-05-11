@@ -1,0 +1,59 @@
+{
+    "sleep": {
+        "images": "sleep",
+        "act_num": 1,
+        "frame_refresh": 0.08,
+        "hold_frame": 30
+    },
+    "patpat": {
+        "images": "patpat",
+        "act_num": 1,
+        "frame_refresh": 0.15
+    },
+    "fall": {
+        "images": "fall",
+        "act_num": 1,
+        "frame_refresh": 0.05
+    },
+    "feed_2": {
+        "images": "feed_2",
+        "act_num": 1,
+        "frame_refresh": 0.15
+    },
+    "stand": {
+        "images": "stand",
+        "act_num": 1,
+        "frame_refresh": 0.18
+    },
+    "玩球": {
+        "images": "玩球",
+        "act_num": 1,
+        "frame_refresh": 0.18
+    },
+    "逗猫棒": {
+        "images": "逗猫棒",
+        "act_num": 1,
+        "frame_refresh": 0.08
+    },
+    "leftwalk": {
+        "images": "leftwalk",
+        "act_num": 5,
+        "frame_refresh": 0.08,
+        "need_move": true,
+        "direction": "left",
+        "frame_move": 3.0
+    },
+    "rightwalk": {
+        "images": "rightwalk",
+        "act_num": 5,
+        "frame_refresh": 0.08,
+        "need_move": true,
+        "direction": "right",
+        "frame_move": 3.0
+    },
+    "default": {
+        "images": "stand",
+        "act_num": 1,
+        "frame_refresh": 0.18
+    }
+}

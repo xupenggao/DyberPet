@@ -1,0 +1,16 @@
+{
+    "coverImages": [
+        "cover.png"
+    ],
+    "pfp": "pfp.png",
+    "petName": "哈吉米",
+    "intro": "这是作者用来测试的哈吉米",
+    "tages": {
+        "哈吉米": "#4a9eff"
+    },
+    "author": {
+        "name": "Anthony",
+        "pfp": "pfp.png",
+        "infos": ""
+    }
+}

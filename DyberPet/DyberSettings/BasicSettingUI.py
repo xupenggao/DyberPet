@@ -6,12 +6,12 @@ from sys import platform
 
 from qfluentwidgets import (SettingCardGroup, SwitchSettingCard, HyperlinkCard,InfoBar,
                             ComboBoxSettingCard, ScrollArea, ExpandLayout, InfoBarPosition,
-                            setThemeColor)
+                            setThemeColor, PushButton, setFont)
 
 from qfluentwidgets import FluentIcon as FIF
 from PySide6.QtCore import Qt, Signal, QUrl, QStandardPaths, QLocale
-from PySide6.QtGui import QDesktopServices, QIcon
-from PySide6.QtWidgets import QWidget, QLabel, QApplication
+from PySide6.QtGui import QDesktopServices, QIcon, QFont, QPixmap
+from PySide6.QtWidgets import QWidget, QLabel, QApplication, QSizePolicy, QDialog, QVBoxLayout
 #from qframelesswindow import FramelessWindow
 
 from .custom_utils import Dyber_RangeSettingCard, Dyber_ComboBoxSettingCard, CustomColorSettingCard
@@ -50,7 +50,11 @@ class SettingInterface(ScrollArea):
 
         # setting label
         self.settingLabel = QLabel(self.tr("Settings"), self)
-        
+
+        self.contactAuthorBtn = PushButton(self.tr("联系作者"), self, FIF.PEOPLE)
+        self.contactAuthorBtn.setSizePolicy(QSizePolicy.Maximum, self.contactAuthorBtn.sizePolicy().verticalPolicy())
+        self.contactAuthorBtn.clicked.connect(self.__onContactAuthor)
+
         # Mode =========================================================================================
         self.ModeGroup = SettingCardGroup(self.tr('Mode'), self.scrollWidget)
         # Always on top
@@ -252,6 +256,10 @@ class SettingInterface(ScrollArea):
     def __initLayout(self):
         self.settingLabel.move(50, 20)
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.contactAuthorBtn.move(self.width() - self.contactAuthorBtn.width() - 60, 20)
+
         # add cards to group
         self.ModeGroup.addSettingCard(self.AlwaysOnTopCard)
         self.ModeGroup.addSettingCard(self.AllowDropCard)
@@ -358,6 +366,19 @@ class SettingInterface(ScrollArea):
         settings.default_pet = value
         settings.save_settings()
 
+    def refresh_default_pet(self):
+        combo = self.DefaultPetCard.comboBox
+        combo.blockSignals(True)
+        combo.clear()
+        pet_list = settings.pets
+        for pet in pet_list:
+            combo.addItem(pet, userData=pet)
+        if settings.default_pet in pet_list:
+            combo.setCurrentText(settings.default_pet)
+        elif pet_list:
+            combo.setCurrentText(pet_list[0])
+        combo.blockSignals(False)
+
     def _LanguageChanged(self, value):
         settings.language_code = settings.lang_dict[value]
         settings.save_settings()
@@ -406,6 +427,37 @@ class SettingInterface(ScrollArea):
         else:
             settings.bubble_on = False
         settings.save_settings()
+
+    def __onContactAuthor(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.tr("联系作者"))
+        dialog.setFixedSize(350, 400)
+
+        layout = QVBoxLayout(dialog)
+
+        titleLabel = QLabel(self.tr("微信二维码"))
+        titleLabel.setAlignment(Qt.AlignCenter)
+        setFont(titleLabel, 16, QFont.DemiBold)
+        layout.addWidget(titleLabel)
+
+        qrPath = os.path.join(basedir, 'res/img/IMG_9227.jpg')
+        pixmap = QPixmap(qrPath)
+        if not pixmap.isNull():
+            scaledPixmap = pixmap.scaled(250, 250, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            imgLabel = QLabel()
+            imgLabel.setPixmap(scaledPixmap)
+            imgLabel.setAlignment(Qt.AlignCenter)
+            layout.addWidget(imgLabel, 0, Qt.AlignCenter)
+
+            hintLabel = QLabel(self.tr("扫码添加微信"))
+            hintLabel.setAlignment(Qt.AlignCenter)
+            layout.addWidget(hintLabel)
+        else:
+            errorLabel = QLabel(self.tr("二维码图片未找到"))
+            errorLabel.setAlignment(Qt.AlignCenter)
+            layout.addWidget(errorLabel)
+
+        dialog.exec()
 
 
 
