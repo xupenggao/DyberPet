@@ -722,12 +722,16 @@ class Interaction_worker(QObject):
                 self.drop()
 
         else:
-            #self.stop_interact()
-            #self.interact = 'animat' #None
-            #self.act_name = 'onfloor' #None
-            self.start_interact('animat', 'onfloor')
-            #settings.playid = 0
-            #settings.act_id = 0
+            # 已落地，画面已由 _move_customized 立即切换
+            self.interact = 'animat'
+            self.act_name = 'onfloor'
+            self.interact_altered = False
+            settings.playid = 0
+            settings.act_id = 0
+            if 'onfloor' in self.pet_conf.act_name:
+                self.animat('onfloor')
+            else:
+                self.stop_interact()
 
         #self.sig_repaint_inter.emit()
 

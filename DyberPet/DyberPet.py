@@ -444,6 +444,7 @@ class PetWidget(QWidget):
         self.active_window_idle_current_name = None
         self.active_window_phase_timer = QElapsedTimer()
         self.active_window_phase_duration = 0
+        self._excursion_interaction_paused = False
 
         # 定期将桌宠提到最前，防止被其他窗口覆盖
         self._topmost_timer = QTimer(self)
@@ -521,14 +522,15 @@ class PetWidget(QWidget):
 
             if self.active_window_excursion:
                 self.active_window_walk_timer.stop()
+                self._excursion_interaction_paused = True
             if settings.onfloor == 0:
             # Left press activates Drag interaction
-                if settings.set_fall:              
+                if settings.set_fall:
                     settings.onfloor=0
                 settings.draging=1
                 self.workers['Animation'].pause()
                 self.workers['Interaction'].start_interact('mousedrag')
-            
+
             # Record click
             if self.click_timer.isValid() and self.click_timer.elapsed() <= self.click_interval:
                 self.click_count += 1
@@ -1458,6 +1460,7 @@ class PetWidget(QWidget):
         self.active_window_walk_timer.stop()
         self.active_window_timer.stop()
         self.active_window_excursion = False
+        self._excursion_interaction_paused = False
         self.active_window_home_state = None
         self.active_window_surface = None
         self.active_window_surface_key = None
@@ -1472,6 +1475,7 @@ class PetWidget(QWidget):
 
         home_state = self.active_window_home_state
         self.active_window_excursion = False
+        self._excursion_interaction_paused = False
         self.excursion_changed.emit(False, 0, 0, 0, 0)
         self.active_window_home_state = None
         self.active_window_surface = None
@@ -1598,6 +1602,9 @@ class PetWidget(QWidget):
 
     def _poll_active_window_surface(self):
         if not settings.walk_on_active_window or not self.active_window_excursion:
+            return
+
+        if self._excursion_interaction_paused:
             return
 
         surface = self.active_window_tracker.get_surface()
@@ -1963,6 +1970,7 @@ class PetWidget(QWidget):
         关闭窗口, 系统退出
         :return:
         """
+        settings.save_settings()
         settings.pet_data.save_data()
         settings.pet_data.frozen()
         self._stop_active_window_timers()
@@ -2267,7 +2275,17 @@ class PetWidget(QWidget):
             # 落地情况
             if new_y > self.floor_pos+settings.current_anchor[1]:
                 settings.onfloor = 1
+                settings.draging = 0
                 new_x, new_y = self.limit_in_screen(new_x, new_y)
+                # 立即切换到落地/默认画面，消除卡顿
+                settings.previous_img = settings.current_img
+                if 'onfloor' in self.pet_conf.act_name:
+                    landing_act = self.pet_conf.on_floor
+                else:
+                    landing_act = self.pet_conf.default
+                settings.current_img = landing_act.images[0]
+                settings.current_anchor = [int(i * settings.tunable_scale) for i in landing_act.anchor]
+                self.set_img()
             # 在空中
             else:
                 anim_area = QRect(self.pos() + QPoint(self.width()//2-self.label.width()//2, 
@@ -2401,6 +2419,9 @@ class PetWidget(QWidget):
 
     def resume_animation(self):
         if self.active_window_excursion:
+            self._excursion_interaction_paused = False
+            self.active_window_miss_count = 0
+            self._active_window_walk_step()
             return
         self.workers['Animation'].resume()
     
