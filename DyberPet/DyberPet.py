@@ -1740,6 +1740,10 @@ class PetWidget(QWidget):
     def _process_greeting_mssg(self, bubble_dict:dict):
         companion_bubble = self.offline_companion.get_greeting_bubble()
         if companion_bubble:
+            if not companion_bubble.get('start_audio'):
+                companion_bubble['start_audio'] = bubble_dict.get('start_audio', None)
+            if not companion_bubble.get('end_audio'):
+                companion_bubble['end_audio'] = bubble_dict.get('end_audio', None)
             self._emit_companion_bubble(companion_bubble)
             return
         self.bubble_manager.add_usertag(bubble_dict, 'end', send=True)
