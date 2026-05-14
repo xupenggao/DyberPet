@@ -189,6 +189,57 @@ class SettingInterface(ScrollArea):
             self.AllowBubbleCard.setChecked(False)
         self.AllowBubbleCard.switchButton.checkedChanged.connect(self._AllowBubbleChanged)
 
+        # Offline companion parameters ==============================================================
+        self.CompanionGroup = SettingCardGroup(self.tr('Offline Companion'), self.scrollWidget)
+
+        self.CompanionEnabledCard = SwitchSettingCard(
+            QIcon(os.path.join(basedir, 'res/icons/system/bubble.svg')),
+            self.tr("离线陪伴互动"),
+            self.tr("Use local, rule-based companion bubbles without any online AI"),
+            parent=self.CompanionGroup
+        )
+        self.CompanionEnabledCard.setChecked(settings.companion_enabled)
+        self.CompanionEnabledCard.switchButton.checkedChanged.connect(self._CompanionEnabledChanged)
+
+        self.CompanionProactiveCard = SwitchSettingCard(
+            QIcon(os.path.join(basedir, 'res/icons/system/popup.svg')),
+            self.tr("主动陪伴气泡"),
+            self.tr("Allow the pet to occasionally start a gentle companion bubble on its own"),
+            parent=self.CompanionGroup
+        )
+        self.CompanionProactiveCard.setChecked(settings.companion_proactive)
+        self.CompanionProactiveCard.switchButton.checkedChanged.connect(self._CompanionProactiveChanged)
+
+        self.CompanionContextualCard = SwitchSettingCard(
+            QIcon(os.path.join(basedir, 'res/icons/system/character.svg')),
+            self.tr("工作场景陪伴"),
+            self.tr("Show low-frequency companion bubbles when working in IDE, design, or office apps"),
+            parent=self.CompanionGroup
+        )
+        self.CompanionContextualCard.setChecked(settings.companion_contextual)
+        self.CompanionContextualCard.switchButton.checkedChanged.connect(self._CompanionContextualChanged)
+
+        self.CompanionNightCard = SwitchSettingCard(
+            QIcon(os.path.join(basedir, 'res/icons/moon.svg')),
+            self.tr("深夜陪伴提醒"),
+            self.tr("Allow softer, low-frequency companion bubbles during late-night hours"),
+            parent=self.CompanionGroup
+        )
+        self.CompanionNightCard.setChecked(settings.companion_night)
+        self.CompanionNightCard.switchButton.checkedChanged.connect(self._CompanionNightChanged)
+
+        freq_labels = [self.tr('低'), self.tr('中'), self.tr('高')]
+        self.companionFrequencyCard = Dyber_ComboBoxSettingCard(
+            freq_labels,
+            ['low', 'medium', 'high'],
+            QIcon(os.path.join(basedir, 'res/icons/system/more.svg')),
+            self.tr('互动频率'),
+            self.tr('Choose how often the offline companion should respond or主动冒泡'),
+            parent=self.CompanionGroup
+        )
+        self.companionFrequencyCard.comboBox.setCurrentIndex(['low', 'medium', 'high'].index(settings.companion_frequency))
+        self.companionFrequencyCard.comboBox.currentIndexChanged.connect(self._CompanionFrequencyChanged)
+
         # Personalization ==============================================================================
         self.PersonalGroup = SettingCardGroup(self.tr('Personalization'), self.scrollWidget)
         self.ScaleCard = Dyber_RangeSettingCard(
@@ -274,6 +325,12 @@ class SettingInterface(ScrollArea):
         self.VolumnGroup.addSettingCard(self.AllowToasterCard)
         self.VolumnGroup.addSettingCard(self.AllowBubbleCard)
 
+        self.CompanionGroup.addSettingCard(self.CompanionEnabledCard)
+        self.CompanionGroup.addSettingCard(self.CompanionProactiveCard)
+        self.CompanionGroup.addSettingCard(self.CompanionContextualCard)
+        self.CompanionGroup.addSettingCard(self.CompanionNightCard)
+        self.CompanionGroup.addSettingCard(self.companionFrequencyCard)
+
         self.PersonalGroup.addSettingCard(self.ScaleCard)
         self.PersonalGroup.addSettingCard(self.DefaultPetCard)
         self.PersonalGroup.addSettingCard(self.languageCard)
@@ -286,6 +343,7 @@ class SettingInterface(ScrollArea):
         self.expandLayout.addWidget(self.ModeGroup)
         self.expandLayout.addWidget(self.InteractionGroup)
         self.expandLayout.addWidget(self.VolumnGroup)
+        self.expandLayout.addWidget(self.CompanionGroup)
         self.expandLayout.addWidget(self.PersonalGroup)
 
     def __setQss(self):
@@ -427,6 +485,28 @@ class SettingInterface(ScrollArea):
         else:
             settings.bubble_on = False
         settings.save_settings()
+
+    def _CompanionEnabledChanged(self, isChecked):
+        settings.companion_enabled = isChecked
+        settings.save_settings()
+
+    def _CompanionProactiveChanged(self, isChecked):
+        settings.companion_proactive = isChecked
+        settings.save_settings()
+
+    def _CompanionContextualChanged(self, isChecked):
+        settings.companion_contextual = isChecked
+        settings.save_settings()
+
+    def _CompanionNightChanged(self, isChecked):
+        settings.companion_night = isChecked
+        settings.save_settings()
+
+    def _CompanionFrequencyChanged(self, index):
+        values = ['low', 'medium', 'high']
+        if 0 <= index < len(values):
+            settings.companion_frequency = values[index]
+            settings.save_settings()
 
     def __onContactAuthor(self):
         dialog = QDialog(self)

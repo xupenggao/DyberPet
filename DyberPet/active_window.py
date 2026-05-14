@@ -12,6 +12,7 @@ class WindowSurface:
     right: int
     bottom: int
     owner: str = ""
+    app_name: str = ""
     handle: str = ""
 
     @property
@@ -68,6 +69,8 @@ class ActiveWindowTracker:
             if class_name.value in {"Progman", "WorkerW", "Shell_TrayWnd"}:
                 return None
 
+            app_name = self._get_windows_process_name(pid.value)
+
             rect = wintypes.RECT()
             if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
                 return None
@@ -78,11 +81,40 @@ class ActiveWindowTracker:
                 int(rect.right),
                 int(rect.bottom),
                 owner=class_name.value,
+                app_name=app_name,
                 handle=str(hwnd),
             )
             return surface if surface.usable() else None
         except Exception:
             return None
+
+    def _get_windows_process_name(self, pid_value: int) -> str:
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            kernel32 = ctypes.windll.kernel32
+            process = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid_value)
+            if not process:
+                return ""
+
+            try:
+                size = wintypes.DWORD(260)
+                exe_name = ctypes.create_unicode_buffer(size.value)
+                success = kernel32.QueryFullProcessImageNameW(
+                    process,
+                    0,
+                    exe_name,
+                    ctypes.byref(size),
+                )
+                if not success:
+                    return ""
+                return os.path.splitext(os.path.basename(exe_name.value))[0]
+            finally:
+                kernel32.CloseHandle(process)
+        except Exception:
+            return ""
 
     def _get_macos_surface(self) -> Optional[WindowSurface]:
         script = r'''
@@ -128,6 +160,7 @@ class ActiveWindowTracker:
                 left + width,
                 top + height,
                 owner=owner,
+                app_name=owner,
                 handle=f"{owner}:{title}",
             )
             return surface if surface.usable() else None

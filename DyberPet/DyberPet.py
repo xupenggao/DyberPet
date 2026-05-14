@@ -23,6 +23,7 @@ from .custom_roundmenu import RoundMenu
 from DyberPet.conf import *
 from DyberPet.utils import *
 from DyberPet.modules import *
+from DyberPet.companion import OfflineCompanion
 from DyberPet.Accessory import MouseMoveManager
 from DyberPet.active_window import ActiveWindowTracker
 from DyberPet.custom_widgets import RoundBarBase, LevelBadge
@@ -445,6 +446,10 @@ class PetWidget(QWidget):
         self.active_window_phase_timer = QElapsedTimer()
         self.active_window_phase_duration = 0
         self._excursion_interaction_paused = False
+        self.offline_companion = OfflineCompanion()
+        self.companion_timer = QTimer(self)
+        self.companion_timer.setInterval(60 * 1000)
+        self.companion_timer.timeout.connect(self._poll_companion_bubble)
 
         # 定期将桌宠提到最前，防止被其他窗口覆盖
         self._topmost_timer = QTimer(self)
@@ -462,6 +467,7 @@ class PetWidget(QWidget):
 
         self._setup_ui()
         self._setup_active_window_tracking()
+        self.companion_timer.start()
 
         # 开始动画模块和交互模块
         self.threads = {}
@@ -1732,7 +1738,28 @@ class PetWidget(QWidget):
         self.setup_bubbleText.emit(bubble_dict, self.pos().x()+self.width()//2, self.pos().y()+self.height())
 
     def _process_greeting_mssg(self, bubble_dict:dict):
+        companion_bubble = self.offline_companion.get_greeting_bubble()
+        if companion_bubble:
+            self._emit_companion_bubble(companion_bubble)
+            return
         self.bubble_manager.add_usertag(bubble_dict, 'end', send=True)
+
+    def _emit_companion_bubble(self, bubble_dict):
+        if not bubble_dict or not settings.bubble_on:
+            return
+        self.register_bubbleText(bubble_dict)
+
+    def _current_companion_surface(self):
+        if self.active_window_surface is not None:
+            return self.active_window_surface
+        return self.active_window_tracker.get_surface()
+
+    def _poll_companion_bubble(self):
+        companion_bubble = self.offline_companion.get_proactive_bubble(
+            surface=self._current_companion_surface()
+        )
+        if companion_bubble:
+            self._emit_companion_bubble(companion_bubble)
 
     def register_accessory(self, accs):
         self.setup_acc.emit(accs, self.pos().x()+self.width()//2, self.pos().y()+self.height())
@@ -1823,6 +1850,9 @@ class PetWidget(QWidget):
                 self.focus_time.setMaximum(timeleft)
                 self.focus_time.setValue(timeleft)
                 self.focus_time.setFormat('%s min'%(int(timeleft)))
+            companion_bubble = self.offline_companion.get_focus_bubble('companion_focus_start')
+            if companion_bubble:
+                self._emit_companion_bubble(companion_bubble)
         elif status == 'focus':
             self.focus_time.setValue(timeleft)
             self.focus_time.setFormat('%s min'%(int(timeleft)))
@@ -1832,6 +1862,9 @@ class PetWidget(QWidget):
             self.focus_time.setFormat('')
             #self.focus_window.endFocus()
             self.taskUI_task_end.emit()
+            companion_bubble = self.offline_companion.get_focus_bubble('companion_focus_end')
+            if companion_bubble:
+                self._emit_companion_bubble(companion_bubble)
         elif status == 'focus_cancel':
             self.focus_time.setValue(0)
             self.focus_time.setMaximum(0)
@@ -1920,11 +1953,17 @@ class PetWidget(QWidget):
         if self.click_count >= 7:
             self.bubble_manager.trigger_bubble("pat_frequent")
         elif self.workers['Interaction'].interact != 'patpat':
+            companion_bubble = self.offline_companion.handle_patpat()
             if settings.focus_timer_on:
-                self.bubble_manager.trigger_bubble("pat_focus")
+                if companion_bubble:
+                    self._emit_companion_bubble(companion_bubble)
+                else:
+                    self.bubble_manager.trigger_bubble("pat_focus")
             else:
                 self.workers['Animation'].pause()
                 self.workers['Interaction'].start_interact('patpat')
+                if companion_bubble:
+                    self._emit_companion_bubble(companion_bubble)
 
         # 概率触发浮动的心心
         prob_num_0 = random.uniform(0, 1)

@@ -222,7 +222,8 @@ def init_settings():
 
     global gravity, fixdragspeedx, fixdragspeedy, tunable_scale, scale_dict, volume, \
            language_code, on_top_hint, default_pet, defaultAct, themeColor, minipet_scale, \
-           toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, walk_only, act_speed
+           toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, walk_only, act_speed, \
+           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency
 
     # check json file integrity
     try:
@@ -317,6 +318,15 @@ def init_settings():
         walk_only = data_params.get('walk_only', True)
         #=====================================================
 
+        # Offline companion settings
+        companion_enabled = data_params.get('companion_enabled', True)
+        companion_proactive = data_params.get('companion_proactive', True)
+        companion_contextual = data_params.get('companion_contextual', True)
+        companion_night = data_params.get('companion_night', True)
+        companion_frequency = data_params.get('companion_frequency', 'low')
+        if companion_frequency not in ['low', 'medium', 'high']:
+            companion_frequency = 'low'
+
         # AI Pet Creator API config
         global ai_api_key, ai_api_base
         ai_api_key = data_params.get('ai_api_key', '')
@@ -350,6 +360,11 @@ def init_settings():
         auto_lock = False
         walk_on_active_window = True
         walk_only = True
+        companion_enabled = True
+        companion_proactive = True
+        companion_contextual = True
+        companion_night = True
+        companion_frequency = 'low'
         ai_api_key = ''
         ai_api_base = 'https://ark.cn-beijing.volces.com/api/v3'
         act_speed = {}
@@ -359,7 +374,8 @@ def init_settings():
 def save_settings():
     global file_path, set_fall, gravity, fixdragspeedx, fixdragspeedy, scale_dict, volume, \
            language_code, on_top_hint, default_pet, defaultAct, themeColor, minipet_scale, \
-           toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, walk_only, ai_api_key, ai_api_base, act_speed
+           toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, walk_only, ai_api_key, ai_api_base, act_speed, \
+           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency
 
     data_js = {'gravity':gravity,
                'set_fall': set_fall,
@@ -379,6 +395,11 @@ def save_settings():
                'auto_lock':auto_lock,
                'walk_on_active_window':walk_on_active_window,
                'walk_only':walk_only,
+               'companion_enabled':companion_enabled,
+               'companion_proactive':companion_proactive,
+               'companion_contextual':companion_contextual,
+               'companion_night':companion_night,
+               'companion_frequency':companion_frequency,
                'ai_api_key':ai_api_key,
                'ai_api_base':ai_api_base,
                'act_speed':act_speed

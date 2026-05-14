@@ -1,0 +1,272 @@
+{
+  "_app_blacklist": [
+    "wechat",
+    "qq",
+    "discord",
+    "telegram",
+    "steam",
+    "bilibili",
+    "douyin"
+  ],
+  "_app_category_patterns": {
+    "ide": [
+      "code",
+      "pycharm",
+      "idea",
+      "intellij",
+      "visual studio",
+      "devenv",
+      "cursor",
+      "windsurf",
+      "webstorm",
+      "clion",
+      "rider"
+    ],
+    "design": [
+      "photoshop",
+      "figma",
+      "illustrator",
+      "afterfx",
+      "after effects",
+      "xd",
+      "canva",
+      "sketch"
+    ],
+    "office": [
+      "word",
+      "excel",
+      "powerpoint",
+      "wps",
+      "outlook",
+      "onenote"
+    ],
+    "browser": [
+      "chrome",
+      "msedge",
+      "edge",
+      "firefox",
+      "safari",
+      "opera",
+      "browser"
+    ],
+    "explorer": [
+      "explorer",
+      "finder",
+      "files"
+    ]
+  },
+  "companion_greeting": {
+    "zh_CN": [
+      "回来啦，今天也一起待着。",
+      "见到你了，我在呢。",
+      "新的一天，也慢慢来。"
+    ],
+    "en_US": [
+      "You are back. I'll stay with you.",
+      "I see you. I'm here.",
+      "A new day. We can take it slowly."
+    ]
+  },
+  "companion_patpat": {
+    "zh_CN": [
+      {
+        "message": "嗯，我在这儿。",
+        "focus_only": false
+      },
+      {
+        "message": "这样就很好。",
+        "focus_only": false
+      },
+      {
+        "message": "我陪着你继续。",
+        "focus_only": false
+      },
+      {
+        "message": "摸一下，就继续吧。",
+        "focus_only": true
+      },
+      {
+        "message": "别担心，我还在。",
+        "focus_only": true
+      }
+    ],
+    "en_US": [
+      {
+        "message": "Mm. I'm here.",
+        "focus_only": false
+      },
+      {
+        "message": "This is nice.",
+        "focus_only": false
+      },
+      {
+        "message": "I'll stay with you.",
+        "focus_only": false
+      },
+      {
+        "message": "A quick pat, then back to it.",
+        "focus_only": true
+      },
+      {
+        "message": "Don't worry. I'm still here.",
+        "focus_only": true
+      }
+    ]
+  },
+  "companion_focus_start": {
+    "zh_CN": [
+      "开始啦，我会安静陪你。",
+      "你专注的时候，我就在旁边。",
+      "慢慢来，我不吵你。"
+    ],
+    "en_US": [
+      "Let's begin. I'll stay quiet with you.",
+      "While you focus, I'll stay nearby.",
+      "Take it slowly. I won't interrupt."
+    ]
+  },
+  "companion_focus_end": {
+    "zh_CN": [
+      "辛苦了，先缓一口气。",
+      "这一段结束啦，做得很好。",
+      "你已经认真很久了。"
+    ],
+    "en_US": [
+      "You did well. Breathe a little.",
+      "That part is done. Nicely done.",
+      "You've been trying for a while."
+    ]
+  },
+  "companion_late_night": {
+    "zh_CN": [
+      {
+        "message": "夜深了，我还陪着你。",
+        "night_only": true
+      },
+      {
+        "message": "已经很晚啦，别太勉强。",
+        "night_only": true
+      },
+      {
+        "message": "外面安静下来了，这里也是。",
+        "night_only": true
+      }
+    ],
+    "en_US": [
+      {
+        "message": "It's late. I'm still here with you.",
+        "night_only": true
+      },
+      {
+        "message": "It's getting late. Don't push too hard.",
+        "night_only": true
+      },
+      {
+        "message": "It's quiet outside, and here too.",
+        "night_only": true
+      }
+    ]
+  },
+  "companion_working": {
+    "zh_CN": [
+      {
+        "message": "今天也在和代码待着呢。",
+        "app_category": [
+          "ide"
+        ]
+      },
+      {
+        "message": "这一屏看起来很认真。",
+        "app_category": [
+          "ide"
+        ]
+      },
+      {
+        "message": "又在慢慢打磨画面了。",
+        "app_category": [
+          "design"
+        ]
+      },
+      {
+        "message": "颜色和细节都在变好。",
+        "app_category": [
+          "design"
+        ]
+      },
+      {
+        "message": "今天也在安静处理事情。",
+        "app_category": [
+          "office"
+        ]
+      },
+      {
+        "message": "一项一项来，也很好。",
+        "app_category": [
+          "office"
+        ]
+      }
+    ],
+    "en_US": [
+      {
+        "message": "Looks like another day with code.",
+        "app_category": [
+          "ide"
+        ]
+      },
+      {
+        "message": "This screen looks serious today.",
+        "app_category": [
+          "ide"
+        ]
+      },
+      {
+        "message": "You are shaping the visuals again.",
+        "app_category": [
+          "design"
+        ]
+      },
+      {
+        "message": "The details are getting better.",
+        "app_category": [
+          "design"
+        ]
+      },
+      {
+        "message": "You are handling things one by one.",
+        "app_category": [
+          "office"
+        ]
+      },
+      {
+        "message": "Taking it step by step is enough.",
+        "app_category": [
+          "office"
+        ]
+      }
+    ]
+  },
+  "companion_idle_presence": {
+    "zh_CN": [
+      "我在这儿，慢慢陪着你。",
+      "不用说话，也可以一起待着。",
+      "安安静静地过一会儿吧。"
+    ],
+    "en_US": [
+      "I'm here, keeping you company.",
+      "We don't have to talk to stay together.",
+      "Let's stay quiet for a little while."
+    ]
+  },
+  "companion_return": {
+    "zh_CN": [
+      "回来啦，我刚刚还在等你。",
+      "又见面了，我在。",
+      "你回来了呀。"
+    ],
+    "en_US": [
+      "You are back. I was waiting here.",
+      "There you are. I'm here.",
+      "You're back."
+    ]
+  }
+}

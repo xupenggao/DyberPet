@@ -82,5 +82,29 @@
   },
   "bb_pat_frequent": {
     "image": "bubbles/confused.svg"
+  },
+  "bb_companion_greeting": {
+    "image": "bubbles/blushing.svg"
+  },
+  "bb_companion_patpat": {
+    "image": "bubbles/blushing.svg"
+  },
+  "bb_companion_focus_start": {
+    "image": "bubbles/neutral.svg"
+  },
+  "bb_companion_focus_end": {
+    "image": "bubbles/blushing.svg"
+  },
+  "bb_companion_late_night": {
+    "image": "bubbles/angel.svg"
+  },
+  "bb_companion_working": {
+    "image": "bubbles/neutral.svg"
+  },
+  "bb_companion_idle_presence": {
+    "image": "bubbles/neutral.svg"
+  },
+  "bb_companion_return": {
+    "image": "bubbles/blushing.svg"
   }
 }
