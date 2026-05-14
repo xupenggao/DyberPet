@@ -1,12 +1,15 @@
 """
-One-click release script for DyberPet / LingPet.
-
-Builds the project with Nuitka, zips the output, creates a Gitee Release,
-and uploads the zip as an asset.
+One-click release script for LingPet.
 
 Usage:
-    python release.py v0.7.0 "Bug fixes and new companion feature"
-    python release.py v0.7.0 --skip-build  # skip build, just upload existing zip
+    # Full: build + zip + upload
+    python release.py v0.7.0 "更新说明"
+
+    # Skip build, just zip existing dist and upload
+    python release.py v0.7.0 "更新说明" --skip-build
+
+    # Upload a pre-built zip directly
+    python release.py v0.7.0 "更新说明" --zip path/to/LingPet-v0.7.0.zip
 """
 
 import os
@@ -16,18 +19,19 @@ import shutil
 import zipfile
 import argparse
 import urllib.request
+import urllib.error
 import urllib.parse
 
 
-GITEE_API = "https://gitee.com/api/v5"
-OWNER = "Simon-25"
-REPO = "dyberpet"
+GITHUB_API = "https://api.github.com"
+OWNER = "xupenggao"
+REPO = "petupdate"
 DIST_DIR = "dist/LingPet"
 
 
 def load_token():
-    """Load Gitee token from settings file or environment."""
-    token = os.environ.get("GITEE_TOKEN", "")
+    """Load GitHub token from env or settings file."""
+    token = os.environ.get("GITHUB_TOKEN", "")
     if token:
         return token
 
@@ -35,16 +39,26 @@ def load_token():
     if os.path.isfile(settings_path):
         with open(settings_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        token = data.get("gitee_token", "")
+        token = data.get("github_token", "")
 
     if not token:
-        print("[Error] Gitee token not found. Set GITEE_TOKEN env var or add 'gitee_token' to data/settings.json")
+        print("[Error] GitHub token not found. Set GITHUB_TOKEN env var or add 'github_token' to data/settings.json")
         sys.exit(1)
     return token
 
 
+def _api_request(url, token, method="GET", data=None, content_type=None):
+    """Make a GitHub API request with auth header."""
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header("Accept", "application/vnd.github+json")
+    req.add_header("Authorization", "Bearer " + token)
+    req.add_header("X-GitHub-Api-Version", "2022-11-28")
+    if content_type:
+        req.add_header("Content-Type", content_type)
+    return req
+
+
 def run_build():
-    """Run build_nuitka.bat."""
     print("[1/3] Building with Nuitka...")
     ret = os.system("build_nuitka.bat")
     if ret != 0:
@@ -54,7 +68,6 @@ def run_build():
 
 
 def create_zip(version):
-    """Zip the dist directory."""
     zip_name = f"LingPet-{version}.zip"
     zip_path = os.path.join("dist", zip_name)
 
@@ -74,84 +87,105 @@ def create_zip(version):
     return zip_path
 
 
-def create_release(token, version, notes, zip_path):
-    """Create a Gitee Release and upload the zip."""
-    print(f"[3/3] Creating Gitee Release {version}...")
+def get_or_create_release(token, version, notes):
+    """Get existing release or create a new one."""
+    # Check if release already exists for this tag
+    url = f"{GITHUB_API}/repos/{OWNER}/{REPO}/releases/tags/{version}"
+    req = _api_request(url, token)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            release = json.loads(resp.read())
+        print(f"  Existing release found: {version} (id={release['id']})")
+        return release
+    except urllib.error.HTTPError:
+        pass
 
-    # Create release
-    url = f"{GITEE_API}/repos/{OWNER}/{REPO}/releases"
-    data = urllib.parse.urlencode({
-        "access_token": token,
+    # Create new release
+    print(f"  Creating release {version}...")
+    create_url = f"{GITHUB_API}/repos/{OWNER}/{REPO}/releases"
+    body = json.dumps({
         "tag_name": version,
         "name": f"LingPet {version}",
         "body": notes or f"Release {version}",
-        "target_commitish": "dev",
     }).encode()
 
-    req = urllib.request.Request(url, data=data, method="POST")
+    req = _api_request(create_url, token, method="POST", data=body, content_type="application/json")
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             release = json.loads(resp.read())
+        print(f"  Release created: {version} (id={release['id']})")
+        return release
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        print(f"[Error] Failed to create release: {e.code}\n{body}")
+        err = e.read().decode("utf-8", errors="replace")
+        print(f"[Error] Failed to create release: {e.code}\n{err}")
         sys.exit(1)
 
-    release_id = release["id"]
-    print(f"  Release created: id={release_id}")
 
-    # Upload asset
-    upload_url = f"{GITEE_API}/repos/{OWNER}/{REPO}/releases/{release_id}/attach_files"
-    filename = os.path.basename(zip_path)
-
-    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
-    with open(zip_path, "rb") as f:
-        file_data = f.read()
-
-    body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-        f"Content-Type: application/octet-stream\r\n\r\n"
-    ).encode() + file_data + f"\r\n--{boundary}--\r\n".encode()
-
-    req = urllib.request.Request(
-        upload_url + f"?access_token={token}",
-        data=body,
-        method="POST",
-    )
-    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
-
+def delete_existing_asset(token, release_id, filename):
+    """Delete existing asset with the same name if present."""
+    url = f"{GITHUB_API}/repos/{OWNER}/{REPO}/releases/{release_id}/assets"
+    req = _api_request(url, token)
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            asset = json.loads(resp.read())
-        print(f"  Asset uploaded: {asset.get('name', filename)}")
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode("utf-8", errors="replace")
-        print(f"[Error] Failed to upload asset: {e.code}\n{err_body}")
-        sys.exit(1)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            assets = json.loads(resp.read())
+        for asset in assets:
+            if asset.get("name") == filename:
+                del_url = f"{GITHUB_API}/repos/{OWNER}/{REPO}/releases/assets/{asset['id']}"
+                del_req = _api_request(del_url, token, method="DELETE")
+                urllib.request.urlopen(del_req, timeout=10)
+                print(f"  Old asset deleted: {filename}")
+                break
+    except Exception:
+        pass
 
-    print(f"[3/3] Release {version} published successfully!")
-    print(f"  URL: https://gitee.com/{OWNER}/{REPO}/releases/{version}")
+
+def upload_asset(token, version, zip_path):
+    """Upload zip to the GitHub release using gh CLI."""
+    filename = os.path.basename(zip_path)
+    size_mb = os.path.getsize(zip_path) / (1024 * 1024)
+    print(f"  Uploading {filename} ({size_mb:.1f} MB) via gh CLI...")
+
+    ret = os.system(f'gh release upload {version} "{zip_path}" --repo {OWNER}/{REPO} --clobber')
+    if ret != 0:
+        print("[Error] Upload failed. Make sure 'gh auth login' has been run.")
+        sys.exit(1)
+    print(f"  Asset uploaded: {filename}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build and release LingPet")
+    parser = argparse.ArgumentParser(description="Upload LingPet release to GitHub")
     parser.add_argument("version", help="Version tag, e.g. v0.7.0")
     parser.add_argument("notes", nargs="?", default="", help="Release notes")
-    parser.add_argument("--skip-build", action="store_true", help="Skip build step")
+    parser.add_argument("--skip-build", action="store_true", help="Skip build, zip from dist/")
+    parser.add_argument("--zip", help="Upload a pre-built zip file directly")
     args = parser.parse_args()
 
     token = load_token()
 
-    if not args.skip_build:
-        run_build()
+    if args.zip:
+        zip_path = args.zip
+        if not os.path.isfile(zip_path):
+            print(f"[Error] File not found: {zip_path}")
+            sys.exit(1)
+        name = os.path.basename(zip_path)
+        if not name.startswith("LingPet") or not name.endswith(".zip"):
+            print(f"[Error] Zip must start with 'LingPet' and end with '.zip', got: {name}")
+            sys.exit(1)
+        print(f"[1/2] Uploading: {zip_path}")
+    else:
+        if not args.skip_build:
+            run_build()
 
-    if not os.path.isdir(DIST_DIR):
-        print(f"[Error] {DIST_DIR} not found. Run build first.")
-        sys.exit(1)
+        if not os.path.isdir(DIST_DIR):
+            print(f"[Error] {DIST_DIR} not found. Run build first or use --zip.")
+            sys.exit(1)
 
-    zip_path = create_zip(args.version)
-    create_release(token, args.version, args.notes, zip_path)
+        zip_path = create_zip(args.version)
+
+    release = get_or_create_release(token, args.version, args.notes)
+    upload_asset(token, args.version, zip_path)
+
+    print(f"\nDone! Release: https://github.com/{OWNER}/{REPO}/releases/tag/{args.version}")
 
 
 if __name__ == "__main__":

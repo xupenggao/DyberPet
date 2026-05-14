@@ -50,19 +50,19 @@ class SettingInterface(ScrollArea):
         self.expandLayout = ExpandLayout(self.scrollWidget)
 
         # setting label
-        self.settingLabel = QLabel(self.tr("Settings"), self)
+        self.settingLabel = QLabel(self.tr("基本设置"), self)
 
         self.contactAuthorBtn = PushButton(self.tr("联系作者"), self, FIF.PEOPLE)
         self.contactAuthorBtn.setSizePolicy(QSizePolicy.Maximum, self.contactAuthorBtn.sizePolicy().verticalPolicy())
         self.contactAuthorBtn.clicked.connect(self.__onContactAuthor)
 
         # Mode =========================================================================================
-        self.ModeGroup = SettingCardGroup(self.tr('Mode'), self.scrollWidget)
+        self.ModeGroup = SettingCardGroup(self.tr('模式'), self.scrollWidget)
         # Always on top
         self.AlwaysOnTopCard = SwitchSettingCard(
             FIF.PIN,
-            self.tr("Always-On-Top"),
-            self.tr("Pet will be displayed on top of the other Apps"),
+            self.tr("窗口置顶"),
+            self.tr("开启后桌宠将始终显示在其他应用窗口之上"),
             parent=self.ModeGroup #DisplayModeGroup
         )
         if settings.on_top_hint:
@@ -74,8 +74,8 @@ class SettingInterface(ScrollArea):
         # Allow drop
         self.AllowDropCard = SwitchSettingCard(
             QIcon(os.path.join(basedir, 'res/icons/system/falldown.svg')),
-            self.tr("Allow Drop"),
-            self.tr("When mouse released, pet falls to the ground (on) / stays at the site (off)"),
+            self.tr("允许掉落"),
+            self.tr("鼠标释放后，桌宠掉落到地面（开）或停留在原位（关）"),
             parent=self.ModeGroup #DisplayModeGroup
         )
         if settings.set_fall:
@@ -117,8 +117,8 @@ class SettingInterface(ScrollArea):
         # Auto-Lock
         self.AutoLockCard = SwitchSettingCard(
             QIcon(os.path.join(basedir, 'res/icons/system/lock.svg')),
-            self.tr("Auto-Lock"),
-            self.tr("When screen is locked, HP and FV will be locked too (currently only works in Windows)"),
+            self.tr("自动锁定"),
+            self.tr("锁屏时暂停饱食度和好感度变化（仅支持 Windows）"),
             parent=self.ModeGroup #DisplayModeGroup
         )
         if settings.auto_lock:
@@ -131,12 +131,12 @@ class SettingInterface(ScrollArea):
 
 
         # Interaction parameters =======================================================================
-        self.InteractionGroup = SettingCardGroup(self.tr('Interaction'), self.scrollWidget)
+        self.InteractionGroup = SettingCardGroup(self.tr('交互'), self.scrollWidget)
         self.GravityCard = Dyber_RangeSettingCard(
             1, 200, 0.01,
             QIcon(os.path.join(basedir, 'res/icons/system/gravity.svg')),
-            self.tr("Gravity"),
-            self.tr("Pet falling down acceleration"),
+            self.tr("重力"),
+            self.tr("桌宠掉落的加速度"),
             parent=self.InteractionGroup
         )
 
@@ -146,8 +146,8 @@ class SettingInterface(ScrollArea):
         self.DragCard = Dyber_RangeSettingCard(
             0, 200, 0.01,
             QIcon(os.path.join(basedir, 'res/icons/system/mousedrag.svg')),
-            self.tr("Drag Speed"),
-            self.tr("Mouse speed factor"),
+            self.tr("拖拽速度"),
+            self.tr("鼠标拖拽桌宠的速度系数"),
             parent=self.InteractionGroup
         )
         self.DragCard.setValue(int(settings.fixdragspeedx*100))
@@ -155,12 +155,12 @@ class SettingInterface(ScrollArea):
 
 
         # Notification parameters ======================================================================
-        self.VolumnGroup = SettingCardGroup(self.tr('Notification'), self.scrollWidget)
+        self.VolumnGroup = SettingCardGroup(self.tr('通知'), self.scrollWidget)
         self.VolumnCard = Dyber_RangeSettingCard(
             0, 10, 0.1,
             QIcon(os.path.join(basedir, 'res/icons/system/speaker.svg')),
-            self.tr("Volumn"),
-            self.tr("Volumn of notification and pet"),
+            self.tr("音量"),
+            self.tr("通知和桌宠的音量大小"),
             parent=self.VolumnGroup
         )
         self.VolumnCard.setValue(int(settings.volume*10))
@@ -168,8 +168,8 @@ class SettingInterface(ScrollArea):
 
         self.AllowToasterCard = SwitchSettingCard(
             QIcon(os.path.join(basedir, 'res/icons/system/popup.svg')),
-            self.tr("Pop-up Toaster"),
-            self.tr("When turned on, notification will pop-up at the bottom right corner"),
+            self.tr("弹窗通知"),
+            self.tr("开启后通知将以弹窗形式显示在屏幕右下角"),
             parent=self.VolumnGroup
         )
         if settings.toaster_on:
@@ -180,8 +180,8 @@ class SettingInterface(ScrollArea):
 
         self.AllowBubbleCard = SwitchSettingCard(
             QIcon(os.path.join(basedir, 'res/icons/system/bubble.svg')),
-            self.tr("Dialogue Bubble"),
-            self.tr("When turned on, various kinds of bubbles will pop-up above the pet"),
+            self.tr("对话气泡"),
+            self.tr("开启后桌宠头顶会弹出各种类型的气泡对话"),
             parent=self.VolumnGroup
         )
         if settings.bubble_on:
@@ -196,7 +196,7 @@ class SettingInterface(ScrollArea):
         self.CompanionEnabledCard = SwitchSettingCard(
             QIcon(os.path.join(basedir, 'res/icons/system/bubble.svg')),
             self.tr("离线陪伴互动"),
-            self.tr("Use local, rule-based companion bubbles without any online AI"),
+            self.tr("使用本地规则驱动的陪伴气泡，无需联网 AI"),
             parent=self.CompanionGroup
         )
         self.CompanionEnabledCard.setChecked(settings.companion_enabled)
@@ -205,7 +205,7 @@ class SettingInterface(ScrollArea):
         self.CompanionProactiveCard = SwitchSettingCard(
             QIcon(os.path.join(basedir, 'res/icons/system/popup.svg')),
             self.tr("主动陪伴气泡"),
-            self.tr("Allow the pet to occasionally start a gentle companion bubble on its own"),
+            self.tr("允许桌宠偶尔主动冒出一条温柔的陪伴气泡"),
             parent=self.CompanionGroup
         )
         self.CompanionProactiveCard.setChecked(settings.companion_proactive)
@@ -214,7 +214,7 @@ class SettingInterface(ScrollArea):
         self.CompanionContextualCard = SwitchSettingCard(
             QIcon(os.path.join(basedir, 'res/icons/system/character.svg')),
             self.tr("工作场景陪伴"),
-            self.tr("Show low-frequency companion bubbles when working in IDE, design, or office apps"),
+            self.tr("在 IDE、设计或办公软件中工作时显示低频陪伴气泡"),
             parent=self.CompanionGroup
         )
         self.CompanionContextualCard.setChecked(settings.companion_contextual)
@@ -223,7 +223,7 @@ class SettingInterface(ScrollArea):
         self.CompanionNightCard = SwitchSettingCard(
             QIcon(os.path.join(basedir, 'res/icons/moon.svg')),
             self.tr("深夜陪伴提醒"),
-            self.tr("Allow softer, low-frequency companion bubbles during late-night hours"),
+            self.tr("深夜时段允许更柔和、更低频的陪伴气泡"),
             parent=self.CompanionGroup
         )
         self.CompanionNightCard.setChecked(settings.companion_night)
@@ -235,19 +235,19 @@ class SettingInterface(ScrollArea):
             ['low', 'medium', 'high'],
             QIcon(os.path.join(basedir, 'res/icons/system/more.svg')),
             self.tr('互动频率'),
-            self.tr('Choose how often the offline companion should respond or主动冒泡'),
+            self.tr('选择离线陪伴气泡的互动频率'),
             parent=self.CompanionGroup
         )
         self.companionFrequencyCard.comboBox.setCurrentIndex(['low', 'medium', 'high'].index(settings.companion_frequency))
         self.companionFrequencyCard.comboBox.currentIndexChanged.connect(self._CompanionFrequencyChanged)
 
         # Personalization ==============================================================================
-        self.PersonalGroup = SettingCardGroup(self.tr('Personalization'), self.scrollWidget)
+        self.PersonalGroup = SettingCardGroup(self.tr('个性化'), self.scrollWidget)
         self.ScaleCard = Dyber_RangeSettingCard(
             1, 50, 0.1,
             QIcon(os.path.join(basedir, 'res/icons/system/resize.svg')),
-            self.tr("Pet Scale"),
-            self.tr("Adjust size of the pet"),
+            self.tr("桌宠大小"),
+            self.tr("调整桌宠的显示大小"),
             parent=self.PersonalGroup
         )
         self.ScaleCard.setValue(int(settings.tunable_scale*10))
@@ -258,8 +258,8 @@ class SettingInterface(ScrollArea):
             pet_list,
             pet_list,
             QIcon(os.path.join(basedir, 'res/icons/system/homestar.svg')),
-            self.tr('Default Pet'),
-            self.tr('Pet to show everytime App starts'),
+            self.tr('默认桌宠'),
+            self.tr('每次启动应用时显示的桌宠角色'),
             parent=self.PersonalGroup
         )
         self.DefaultPetCard.comboBox.currentTextChanged.connect(self._DefaultPetChanged)
@@ -273,27 +273,27 @@ class SettingInterface(ScrollArea):
             lang_choices,
             FIF.LANGUAGE,
             self.tr('Language/语言'),
-            self.tr('Set your preferred language for UI'),
+            self.tr('设置界面显示语言'),
             parent=self.PersonalGroup
         )
         self.languageCard.comboBox.currentTextChanged.connect(self._LanguageChanged)
 
         self.themeColorCard = CustomColorSettingCard(
             FIF.PALETTE,
-            self.tr('Theme color'),
-            self.tr('Change the theme color of you application'),
+            self.tr('主题色'),
+            self.tr('更改应用的主题配色'),
             self.PersonalGroup
         )
         self.themeColorCard.colorChanged.connect(self.colorChanged)
 
         # Update section ================================================================
-        self.UpdateGroup = SettingCardGroup(self.tr('Update'), self.scrollWidget)
+        self.UpdateGroup = SettingCardGroup(self.tr('更新'), self.scrollWidget)
         self.checkUpdateBtn = PushButton(self.tr('检查更新'), self, FIF.SYNC)
         self.checkUpdateBtn.setFixedHeight(36)
         self.checkUpdateBtn.clicked.connect(self._onCheckUpdate)
 
         self.versionLabel = QLabel(
-            self.tr('Current version: ') + settings.VERSION,
+            self.tr('当前版本：') + settings.VERSION,
             self.scrollWidget
         )
         self.versionLabel.setStyleSheet('color: #666; padding-left: 12px;')
@@ -482,11 +482,11 @@ class SettingInterface(ScrollArea):
         if success:
             update_needed = compare_versions(local_version, github_version)
             if update_needed:
-                return True, local_version + "  " + self.tr("New version available")
+                return True, local_version + "  " + self.tr("有新版本可用")
             else:
-                return False, local_version + "  " + self.tr("Already the latest")
+                return False, local_version + "  " + self.tr("已是最新版本")
         else:
-            return False, self.tr("Failed to check updates. Please check the website.")
+            return False, self.tr("检查更新失败，请检查网络连接")
 
     def _onCheckUpdate(self):
         self.checkUpdateBtn.setEnabled(False)
@@ -497,21 +497,35 @@ class SettingInterface(ScrollArea):
         self._update_thread.start()
 
     def _onUpdateChecked(self):
+        from DyberPet.updater import _NO_RELEASE, _NET_ERROR
+
         has_update, version, url, notes, size = self._update_thread.result
         self.checkUpdateBtn.setEnabled(True)
         self.checkUpdateBtn.setText(self.tr('检查更新'))
 
         if not has_update:
-            if version:
+            if version == _NO_RELEASE:
+                InfoBar.info(
+                    '', self.tr('暂未发布新版本'),
+                    duration=3000, position=InfoBarPosition.BOTTOM, parent=self.window()
+                )
+            elif version and version not in (_NO_RELEASE, _NET_ERROR):
                 InfoBar.success(
                     '', self.tr('已是最新版本 ') + version,
                     duration=3000, position=InfoBarPosition.BOTTOM, parent=self.window()
                 )
             else:
                 InfoBar.warning(
-                    '', self.tr('检查更新失败，请检查网络或 Gitee Token 配置'),
+                    '', self.tr('检查更新失败，请检查网络连接'),
                     duration=4000, position=InfoBarPosition.BOTTOM, parent=self.window()
                 )
+            return
+
+        if not url:
+            InfoBar.info(
+                '', self.tr('发现新版本 ') + version + self.tr('，但安装包尚未上传，请稍后再试'),
+                duration=5000, position=InfoBarPosition.BOTTOM, parent=self.window()
+            )
             return
 
         msg = MessageBox(

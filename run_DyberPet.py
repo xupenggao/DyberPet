@@ -21,7 +21,7 @@ from DyberPet.Accessory import DPAccessory
 
 from PySide6.QtWidgets import QApplication
 from PySide6 import QtCore
-from PySide6.QtCore import Qt, QLocale, QTimer, QDateTime, QDate, Signal, QTime
+from PySide6.QtCore import Qt, QLocale, QTimer, QDateTime, QDate, Signal, QTime, QThread
 
 from qfluentwidgets import  FluentTranslator, setThemeColor
 from DyberPet.DyberSettings.DyberControlPanel import ControlMainWindow
@@ -91,6 +91,9 @@ class DyberPetApp(QApplication):
 
         # Signal Links
         self.__connectSignalToSlot()
+
+        # Startup update check (silent, background)
+        self._startup_update_check()
 
     def __connectSignalToSlot(self):
         # Main Widget - others
@@ -206,8 +209,23 @@ class DyberPetApp(QApplication):
         self.p._set_Statusmenu()
         self.p._set_tray()
 
+    def _startup_update_check(self):
+        self._update_check_thread = _StartupUpdateThread()
+        self._update_check_thread.update_found.connect(self._on_startup_update_found)
+        self._update_check_thread.start()
 
-        
+    def _on_startup_update_found(self, version):
+        self.p.register_notification("system", self.tr("New version available: ") + version + self.tr(". Go to Settings to update."))
+
+
+class _StartupUpdateThread(QThread):
+    update_found = Signal(str)
+
+    def run(self):
+        from DyberPet.updater import check_update
+        has_update, version, *_ = check_update()
+        if has_update and version:
+            self.update_found.emit(version)
 
 
 if __name__ == '__main__':
