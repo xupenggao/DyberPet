@@ -166,18 +166,46 @@ class CharInterface(ScrollArea):
 
     def __connectSignalToSlot(self):
         """ connect signal to slot """
-        
+
         for i, charCard in enumerate(self.CharCardList):
+            try:
+                self.CharLineList[i].launchClicked.disconnect()
+            except RuntimeError:
+                pass
             self.CharLineList[i].launchClicked.connect(self.__onLaunchClicked)
 
             if charCard:
+                try:
+                    self.CharLineList[i].infoClicked.disconnect()
+                except RuntimeError:
+                    pass
                 self.CharLineList[i].infoClicked.connect(self.__onInfoClicked)
-        
+
+                try:
+                    self.CharCardList[i].card.gotoClicked.disconnect()
+                except RuntimeError:
+                    pass
                 self.CharCardList[i].card.gotoClicked.connect(self.__onGotoClicked)
+                try:
+                    self.CharCardList[i].card.deleteClicked.disconnect()
+                except RuntimeError:
+                    pass
                 self.CharCardList[i].card.deleteClicked.connect(self.__onDeleteClicked)
 
+        try:
+            self.addButton.clicked.disconnect()
+        except RuntimeError:
+            pass
         self.addButton.clicked.connect(self.__onAddClicked)
+        try:
+            self.panelHelp.clicked.disconnect()
+        except RuntimeError:
+            pass
         self.panelHelp.clicked.connect(self.__onShowInstruction)
+        try:
+            self.contactAuthorBtn.clicked.disconnect()
+        except RuntimeError:
+            pass
         self.contactAuthorBtn.clicked.connect(self.__onContactAuthor)
 
     def __onLaunchClicked(self, petname):

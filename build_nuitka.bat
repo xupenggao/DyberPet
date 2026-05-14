@@ -18,13 +18,15 @@ cd /d "%~dp0"
 )
 
 :: ---------- Clean old build ----------
-echo [1/4] Cleaning old build...
+echo [1/5] Cleaning old build...
 if exist run_DyberPet.build rd /s /q run_DyberPet.build
 if exist run_DyberPet.dist rd /s /q run_DyberPet.dist
+if exist updater.build rd /s /q updater.build
+if exist updater.dist rd /s /q updater.dist
 if exist dist rd /s /q dist
 
-:: ---------- Build ----------
-echo [2/4] Compiling with Nuitka (may take 10-30 min on first run)...
+:: ---------- Build main app ----------
+echo [2/5] Compiling main app with Nuitka (may take 10-30 min on first run)...
 echo        Nuitka will auto-download MinGW64 if no C compiler is found.
 echo.
 
@@ -52,27 +54,56 @@ echo.
 
 if errorlevel 1 (
     echo.
-    echo [Error] Build failed! Check the errors above.
+    echo [Error] Main app build failed! Check the errors above.
+    pause
+    exit /b 1
+)
+
+:: ---------- Build updater ----------
+echo.
+echo [3/5] Compiling updater.exe...
+echo.
+
+.venv\Scripts\python.exe -m nuitka ^
+    --standalone ^
+    --onefile ^
+    --mingw64 ^
+    --windows-disable-console ^
+    --windows-icon-from-ico=res\icons\arrow-204-32.ico ^
+    --output-filename=updater.exe ^
+    --output-dir=. ^
+    --show-progress ^
+    --assume-yes-for-downloads ^
+    updater.py
+
+if errorlevel 1 (
+    echo.
+    echo [Error] Updater build failed! Check the errors above.
     pause
     exit /b 1
 )
 
 :: ---------- Move output ----------
 echo.
-echo [3/4] Organizing output...
+echo [4/5] Organizing output...
 mkdir dist 2>nul
 move "run_DyberPet.dist" "dist\LingPet" >nul
+copy "updater.dist\updater.exe" "dist\LingPet\updater.exe" >nul
 
 :: ---------- Done ----------
 echo.
-echo [4/4] Build complete!
+echo [5/5] Build complete!
 echo Output: dist\LingPet\LingPet.exe
-for %%A in ("dist\LingPet\LingPet.exe") do echo Size: %%~zA bytes
+echo Updater: dist\LingPet\updater.exe
+for %%A in ("dist\LingPet\LingPet.exe") do echo Main exe size: %%~zA bytes
+for %%A in ("dist\LingPet\updater.exe") do echo Updater size: %%~zA bytes
 echo.
 echo You can zip the dist\LingPet folder for distribution.
 
 echo Cleaning build temp files...
 if exist run_DyberPet.build rd /s /q run_DyberPet.build 2>nul
+if exist updater.build rd /s /q updater.build 2>nul
+if exist updater.dist rd /s /q updater.dist 2>nul
 
 echo Done.
 pause

@@ -37,9 +37,10 @@ CHARCOLLECT_LINK = "https://github.com/ChaozhongLiu/DyberPet/blob/main/docs/coll
 ITEMCOLLECT_LINK = "https://github.com/ChaozhongLiu/DyberPet/blob/main/docs/collection.md"
 PETCOLLECT_LINK = "https://github.com/ChaozhongLiu/DyberPet/blob/main/docs/collection.md"
 
-RELEASE_API = "https://api.github.com/repos/ChaozhongLiu/DyberPet/releases/latest"
-RELEASE_URL = "https://github.com/ChaozhongLiu/DyberPet/releases/latest"
+RELEASE_API = "https://gitee.com/api/v5/repos/Simon-25/dyberpet/releases/latest"
+RELEASE_URL = "https://gitee.com/Simon-25/dyberpet/releases"
 UPDATE_NEEDED = False
+GITEE_TOKEN = "b7954b1ef713aeea89d68a8167d2a32d"
 
 HP_TIERS = [0,50,80,100]
 TIER_NAMES = ['Starving', 'Hungry', 'Normal', 'Energetic']
@@ -223,7 +224,8 @@ def init_settings():
     global gravity, fixdragspeedx, fixdragspeedy, tunable_scale, scale_dict, volume, \
            language_code, on_top_hint, default_pet, defaultAct, themeColor, minipet_scale, \
            toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, walk_only, act_speed, \
-           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency
+           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency, \
+           gitee_token
 
     # check json file integrity
     try:
@@ -338,6 +340,10 @@ def init_settings():
         global act_speed
         act_speed = data_params.get('act_speed', {})
 
+        # Gitee token for private repo update
+        global gitee_token
+        gitee_token = data_params.get('gitee_token', '')
+
     else:
         fixdragspeedx, fixdragspeedy = 1.0, 1.0
         gravity = 0.4
@@ -368,6 +374,7 @@ def init_settings():
         ai_api_key = ''
         ai_api_base = 'https://ark.cn-beijing.volces.com/api/v3'
         act_speed = {}
+        gitee_token = ''
     check_locale()
     save_settings()
 
@@ -375,7 +382,8 @@ def save_settings():
     global file_path, set_fall, gravity, fixdragspeedx, fixdragspeedy, scale_dict, volume, \
            language_code, on_top_hint, default_pet, defaultAct, themeColor, minipet_scale, \
            toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, walk_only, ai_api_key, ai_api_base, act_speed, \
-           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency
+           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency, \
+           gitee_token
 
     data_js = {'gravity':gravity,
                'set_fall': set_fall,
@@ -402,7 +410,8 @@ def save_settings():
                'companion_frequency':companion_frequency,
                'ai_api_key':ai_api_key,
                'ai_api_base':ai_api_base,
-               'act_speed':act_speed
+               'act_speed':act_speed,
+               'gitee_token':gitee_token
                }
 
     with open(file_path, 'w', encoding='utf-8') as f:

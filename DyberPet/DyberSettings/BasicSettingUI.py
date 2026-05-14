@@ -6,16 +6,17 @@ from sys import platform
 
 from qfluentwidgets import (SettingCardGroup, SwitchSettingCard, HyperlinkCard,InfoBar,
                             ComboBoxSettingCard, ScrollArea, ExpandLayout, InfoBarPosition,
-                            setThemeColor, PushButton, setFont)
+                            setThemeColor, PushButton, setFont, MessageBox)
 
 from qfluentwidgets import FluentIcon as FIF
-from PySide6.QtCore import Qt, Signal, QUrl, QStandardPaths, QLocale
+from PySide6.QtCore import Qt, Signal, QUrl, QStandardPaths, QLocale, QThread
 from PySide6.QtGui import QDesktopServices, QIcon, QFont, QPixmap
-from PySide6.QtWidgets import QWidget, QLabel, QApplication, QSizePolicy, QDialog, QVBoxLayout
+from PySide6.QtWidgets import QWidget, QLabel, QApplication, QSizePolicy, QDialog, QVBoxLayout, QProgressDialog
 #from qframelesswindow import FramelessWindow
 
 from .custom_utils import Dyber_RangeSettingCard, Dyber_ComboBoxSettingCard, CustomColorSettingCard
 import DyberPet.settings as settings
+from DyberPet.updater import check_update, download_update, prepare_update, launch_updater
 
 basedir = settings.BASEDIR
 module_path = os.path.join(basedir, 'DyberPet/DyberSettings/')
@@ -285,6 +286,17 @@ class SettingInterface(ScrollArea):
         )
         self.themeColorCard.colorChanged.connect(self.colorChanged)
 
+        # Update section ================================================================
+        self.UpdateGroup = SettingCardGroup(self.tr('Update'), self.scrollWidget)
+        self.checkUpdateBtn = PushButton(self.tr('检查更新'), self, FIF.SYNC)
+        self.checkUpdateBtn.setFixedHeight(36)
+        self.checkUpdateBtn.clicked.connect(self._onCheckUpdate)
+
+        self.versionLabel = QLabel(
+            self.tr('Current version: ') + settings.VERSION,
+            self.scrollWidget
+        )
+        self.versionLabel.setStyleSheet('color: #666; padding-left: 12px;')
 
 
         self.__initWidget()
@@ -336,6 +348,9 @@ class SettingInterface(ScrollArea):
         self.PersonalGroup.addSettingCard(self.languageCard)
         self.PersonalGroup.addSettingCard(self.themeColorCard)
 
+        self.UpdateGroup.addSettingCard(self.checkUpdateBtn)
+        self.UpdateGroup.addSettingCard(self.versionLabel)
+
         # add setting card group to layout
         self.expandLayout.setSpacing(28)
         self.expandLayout.setContentsMargins(60, 10, 60, 0)
@@ -345,6 +360,7 @@ class SettingInterface(ScrollArea):
         self.expandLayout.addWidget(self.VolumnGroup)
         self.expandLayout.addWidget(self.CompanionGroup)
         self.expandLayout.addWidget(self.PersonalGroup)
+        self.expandLayout.addWidget(self.UpdateGroup)
 
     def __setQss(self):
         """ set style sheet """
@@ -471,6 +487,87 @@ class SettingInterface(ScrollArea):
                 return False, local_version + "  " + self.tr("Already the latest")
         else:
             return False, self.tr("Failed to check updates. Please check the website.")
+
+    def _onCheckUpdate(self):
+        self.checkUpdateBtn.setEnabled(False)
+        self.checkUpdateBtn.setText(self.tr('检查中...'))
+
+        self._update_thread = _CheckUpdateThread()
+        self._update_thread.finished.connect(self._onUpdateChecked)
+        self._update_thread.start()
+
+    def _onUpdateChecked(self):
+        has_update, version, url, notes, size = self._update_thread.result
+        self.checkUpdateBtn.setEnabled(True)
+        self.checkUpdateBtn.setText(self.tr('检查更新'))
+
+        if not has_update:
+            if version:
+                InfoBar.success(
+                    '', self.tr('已是最新版本 ') + version,
+                    duration=3000, position=InfoBarPosition.BOTTOM, parent=self.window()
+                )
+            else:
+                InfoBar.warning(
+                    '', self.tr('检查更新失败，请检查网络或 Gitee Token 配置'),
+                    duration=4000, position=InfoBarPosition.BOTTOM, parent=self.window()
+                )
+            return
+
+        msg = MessageBox(
+            self.tr('发现新版本 ') + version,
+            (notes or self.tr('无更新说明')) + '\n\n' + self.tr('是否立即下载并更新？'),
+            self.window()
+        )
+        msg.yesButton.setText(self.tr('立即更新'))
+        msg.cancelButton.setText(self.tr('稍后再说'))
+        if msg.exec():
+            self._start_download(url)
+
+    def _start_download(self, url):
+        self._progress = QProgressDialog(self.tr('正在下载更新...'), None, 0, 100, self.window())
+        self._progress.setWindowTitle(self.tr('下载更新'))
+        self._progress.setWindowModality(Qt.WindowModal)
+        self._progress.setMinimumDuration(0)
+        self._progress.setValue(0)
+
+        self._download_thread = _DownloadThread(url)
+        self._download_thread.progress.connect(self._onDownloadProgress)
+        self._download_thread.finished.connect(self._onDownloadFinished)
+        self._download_thread.start()
+
+    def _onDownloadProgress(self, downloaded, total):
+        if total > 0:
+            self._progress.setValue(int(downloaded / total * 100))
+
+    def _onDownloadFinished(self):
+        zip_path = self._download_thread.result
+        if hasattr(self, '_progress'):
+            self._progress.close()
+
+        if not zip_path:
+            InfoBar.error(
+                '', self.tr('下载失败，请重试'),
+                duration=3000, position=InfoBarPosition.BOTTOM, parent=self.window()
+            )
+            return
+
+        source_dir = prepare_update(zip_path)
+        if not source_dir:
+            InfoBar.error(
+                '', self.tr('解压更新包失败'),
+                duration=3000, position=InfoBarPosition.BOTTOM, parent=self.window()
+            )
+            return
+
+        ok = launch_updater(source_dir)
+        if ok:
+            QApplication.quit()
+        else:
+            InfoBar.error(
+                '', self.tr('启动更新程序失败，请手动下载更新'),
+                duration=3000, position=InfoBarPosition.BOTTOM, parent=self.window()
+            )
         
     def _AllowToasterChanged(self, isChecked):
         if isChecked:
@@ -577,3 +674,27 @@ def compare_versions(local_version, github_version):
         return True  # User should update
     else:
         return False  # Local version is up to date or ahead
+
+
+class _CheckUpdateThread(QThread):
+    """Background thread to check for updates via Gitee API."""
+
+    def run(self):
+        self.result = check_update()
+
+
+class _DownloadThread(QThread):
+    """Background thread to download the update zip."""
+
+    progress = Signal(int, int)
+
+    def __init__(self, url, parent=None):
+        super().__init__(parent)
+        self.url = url
+        self.result = None
+
+    def run(self):
+        def _progress_cb(downloaded, total):
+            self.progress.emit(downloaded, total)
+
+        self.result = download_update(self.url, progress_cb=_progress_cb)
