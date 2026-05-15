@@ -1,0 +1,9 @@
+# 打包并上传
+python release.py v0.6.9 "更新说明" --skip-build
+
+# 上传已打包的zip
+python release.py v0.7.0 "更新说明" --zip dist/LingPet-v0.7.0.zip
+
+
+1. 修改 DyberPet/settings.py 中的 VERSION = "v0.7.0"
+2. python release.py v0.7.0 "更新说明"
