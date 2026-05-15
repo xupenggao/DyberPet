@@ -10,19 +10,10 @@ import subprocess
 
 from DyberPet.settings import VERSION, RELEASE_API, BASEDIR
 
+_HEADERS = {'Accept': 'application/vnd.github+json', 'User-Agent': 'LingPet-Updater'}
 
 _NO_RELEASE = '__NO_RELEASE__'
 _NET_ERROR = '__NET_ERROR__'
-
-
-def _make_request(url, token=None):
-    """Create a Request with optional GitHub token auth header."""
-    req = urllib.request.Request(url)
-    req.add_header('Accept', 'application/vnd.github+json')
-    if token:
-        req.add_header('Authorization', 'Bearer ' + token)
-        req.add_header('X-GitHub-Api-Version', '2022-11-28')
-    return req
 
 
 def check_update():
@@ -31,12 +22,8 @@ def check_update():
     Returns (has_update, version, download_url, notes, file_size).
     On failure returns (False, error_tag, None, None, None).
     """
-    from DyberPet import settings as s
-
-    token = getattr(s, 'github_token', '')
-    req = _make_request(RELEASE_API, token)
-
     try:
+        req = urllib.request.Request(RELEASE_API, headers=_HEADERS)
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read())
     except urllib.error.HTTPError as e:
@@ -79,22 +66,14 @@ def _compare(local, remote):
 def download_update(url, progress_cb=None):
     """Download update zip to a temp file.
 
-    Args:
-        url: Download URL (GitHub asset URL, supports redirect).
-        progress_cb: Callable(downloaded_bytes, total_bytes).
-
     Returns path to the downloaded zip, or None on failure.
     """
-    from DyberPet import settings as s
-
-    token = getattr(s, 'github_token', '')
-    req = _make_request(url, token)
-
     tmp_dir = tempfile.mkdtemp(prefix='dyberpet_update_')
     tmp_path = os.path.join(tmp_dir, 'update.zip')
 
     try:
-        resp = urllib.request.urlopen(req, timeout=120)
+        req = urllib.request.Request(url, headers=_HEADERS)
+        resp = urllib.request.urlopen(req, timeout=300)
 
         total = int(resp.headers.get('Content-Length', 0))
         downloaded = 0
@@ -110,6 +89,23 @@ def download_update(url, progress_cb=None):
                 if progress_cb:
                     progress_cb(downloaded, total)
 
+        resp.close()
+
+        # Validate downloaded file
+        if os.path.getsize(tmp_path) < 1024:
+            os.remove(tmp_path)
+            return None
+
+        # Verify it's a valid zip
+        try:
+            with zipfile.ZipFile(tmp_path, 'r') as zf:
+                if not zf.namelist():
+                    os.remove(tmp_path)
+                    return None
+        except zipfile.BadZipFile:
+            os.remove(tmp_path)
+            return None
+
         return tmp_path
     except Exception:
         if os.path.exists(tmp_path):
@@ -124,6 +120,7 @@ def prepare_update(zip_path):
         with zipfile.ZipFile(zip_path, 'r') as zf:
             zf.extractall(extract_dir)
 
+        # Zip contains LingPet/... - find the actual content directory
         entries = os.listdir(extract_dir)
         if len(entries) == 1 and os.path.isdir(os.path.join(extract_dir, entries[0])):
             return os.path.join(extract_dir, entries[0])

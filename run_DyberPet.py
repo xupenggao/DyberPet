@@ -23,7 +23,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6 import QtCore
 from PySide6.QtCore import Qt, QLocale, QTimer, QDateTime, QDate, Signal, QTime, QThread
 
-from qfluentwidgets import  FluentTranslator, setThemeColor
+from qfluentwidgets import  FluentTranslator, setThemeColor, InfoBar, InfoBarPosition
 from DyberPet.DyberSettings.DyberControlPanel import ControlMainWindow
 from DyberPet.Dashboard.DashboardUI import DashboardMainWindow
 
@@ -215,7 +215,10 @@ class DyberPetApp(QApplication):
         self._update_check_thread.start()
 
     def _on_startup_update_found(self, version):
-        self.p.register_notification("system", self.tr("New version available: ") + version + self.tr(". Go to Settings to update."))
+        InfoBar.info(
+            '', self.tr("发现新版本 ") + version + self.tr("，请前往 设置 → 更新 中下载"),
+            duration=8000, position=InfoBarPosition.BOTTOM, parent=self.conp
+        )
 
 
 class _StartupUpdateThread(QThread):

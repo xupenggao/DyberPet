@@ -31,7 +31,7 @@ DEFAULT_THEME_COL = "#009faa"
 HELP_URL = "https://github.com/ChaozhongLiu/DyberPet/issues"
 PROJECT_URL = "https://github.com/ChaozhongLiu/DyberPet"
 DEVDOC_URL = "https://github.com/ChaozhongLiu/DyberPet/blob/main/docs/art_dev.md"
-VERSION = "v0.6.7"
+VERSION = "v0.7.0"
 AUTHOR = "https://github.com/ChaozhongLiu"
 CHARCOLLECT_LINK = "https://github.com/ChaozhongLiu/DyberPet/blob/main/docs/collection.md"
 ITEMCOLLECT_LINK = "https://github.com/ChaozhongLiu/DyberPet/blob/main/docs/collection.md"
@@ -40,7 +40,6 @@ PETCOLLECT_LINK = "https://github.com/ChaozhongLiu/DyberPet/blob/main/docs/colle
 RELEASE_API = "https://api.github.com/repos/xupenggao/petupdate/releases/latest"
 RELEASE_URL = "https://github.com/xupenggao/petupdate/releases"
 UPDATE_NEEDED = False
-GITHUB_TOKEN = ""
 
 HP_TIERS = [0,50,80,100]
 TIER_NAMES = ['Starving', 'Hungry', 'Normal', 'Energetic']
@@ -224,8 +223,7 @@ def init_settings():
     global gravity, fixdragspeedx, fixdragspeedy, tunable_scale, scale_dict, volume, \
            language_code, on_top_hint, default_pet, defaultAct, themeColor, minipet_scale, \
            toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, walk_only, act_speed, \
-           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency, \
-           github_token
+           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency
 
     # check json file integrity
     try:
@@ -340,10 +338,6 @@ def init_settings():
         global act_speed
         act_speed = data_params.get('act_speed', {})
 
-        # GitHub token for private repo update
-        global github_token
-        github_token = data_params.get('github_token', '')
-
     else:
         fixdragspeedx, fixdragspeedy = 1.0, 1.0
         gravity = 0.4
@@ -374,7 +368,6 @@ def init_settings():
         ai_api_key = ''
         ai_api_base = 'https://ark.cn-beijing.volces.com/api/v3'
         act_speed = {}
-        github_token = ''
     check_locale()
     save_settings()
 
@@ -382,8 +375,7 @@ def save_settings():
     global file_path, set_fall, gravity, fixdragspeedx, fixdragspeedy, scale_dict, volume, \
            language_code, on_top_hint, default_pet, defaultAct, themeColor, minipet_scale, \
            toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, walk_only, ai_api_key, ai_api_base, act_speed, \
-           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency, \
-           github_token
+           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency
 
     data_js = {'gravity':gravity,
                'set_fall': set_fall,
@@ -410,8 +402,7 @@ def save_settings():
                'companion_frequency':companion_frequency,
                'ai_api_key':ai_api_key,
                'ai_api_base':ai_api_base,
-               'act_speed':act_speed,
-               'github_token':github_token
+               'act_speed':act_speed
                }
 
     with open(file_path, 'w', encoding='utf-8') as f:
