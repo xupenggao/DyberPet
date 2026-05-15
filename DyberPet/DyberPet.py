@@ -1957,7 +1957,14 @@ class PetWidget(QWidget):
         if self.click_count >= 7:
             self.bubble_manager.trigger_bubble("pat_frequent")
         elif self.workers['Interaction'].interact != 'patpat':
-            companion_bubble = self.offline_companion.handle_patpat()
+            focus_elapsed_minutes = None
+            if settings.focus_timer_on:
+                focus_total = int(self.focus_time.maximum()) if self.focus_time.maximum() else 0
+                focus_remaining = int(self.focus_time.value()) if self.focus_time.value() else 0
+                focus_elapsed_minutes = max(0, focus_total - focus_remaining)
+            companion_bubble = self.offline_companion.handle_patpat(
+                focus_elapsed_minutes=focus_elapsed_minutes
+            )
             if settings.focus_timer_on:
                 if companion_bubble:
                     self._emit_companion_bubble(companion_bubble)
