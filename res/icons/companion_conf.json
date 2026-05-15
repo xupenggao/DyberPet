@@ -57,9 +57,12 @@
   },
   "companion_greeting": {
     "zh_CN": [
-      "回来啦，今天也一起待着。",
-      "见到你了，我在呢。",
-      "新的一天，也慢慢来。"
+      "回来啦。",
+      "见到你了。",
+      "屏幕亮了，我也在。",
+      "今天也一起待着。",
+      "我准备好陪你了。",
+      "慢慢开始吧。"
     ],
     "en_US": [
       "You are back. I'll stay with you.",
@@ -70,7 +73,7 @@
   "companion_patpat": {
     "zh_CN": [
       {
-        "message": "嗯，我在这儿。",
+        "message": "嗯，我在呢。",
         "focus_only": false
       },
       {
@@ -78,8 +81,80 @@
         "focus_only": false
       },
       {
+        "message": "感受到啦。",
+        "focus_only": false
+      },
+      {
+        "message": "一点点温暖。",
+        "focus_only": false
+      },
+      {
         "message": "我陪着你继续。",
         "focus_only": false
+      },
+      {
+        "message": "不着急的。",
+        "focus_only": false
+      },
+      {
+        "message": "先把这几分钟稳住吧。",
+        "focus_only": true,
+        "max_focus_elapsed": 5
+      },
+      {
+        "message": "刚开始，先别分神。",
+        "focus_only": true,
+        "max_focus_elapsed": 5
+      },
+      {
+        "message": "先顾好眼前这小段。",
+        "focus_only": true,
+        "max_focus_elapsed": 5
+      },
+      {
+        "message": "已经慢慢进入状态了。",
+        "focus_only": true,
+        "min_focus_elapsed": 6,
+        "max_focus_elapsed": 19
+      },
+      {
+        "message": "先顺着这段做下去吧。",
+        "focus_only": true,
+        "min_focus_elapsed": 6,
+        "max_focus_elapsed": 19
+      },
+      {
+        "message": "这会儿节奏挺好的。",
+        "focus_only": true,
+        "min_focus_elapsed": 6,
+        "max_focus_elapsed": 19
+      },
+      {
+        "message": "我在旁边，不打断你。",
+        "focus_only": true,
+        "min_focus_elapsed": 6,
+        "max_focus_elapsed": 19
+      },
+      {
+        "message": "继续一小段就很好。",
+        "focus_only": true,
+        "min_focus_elapsed": 6,
+        "max_focus_elapsed": 19
+      },
+      {
+        "message": "你已经坚持一会儿了。",
+        "focus_only": true,
+        "min_focus_elapsed": 20
+      },
+      {
+        "message": "累了的话，就慢一点。",
+        "focus_only": true,
+        "min_focus_elapsed": 20
+      },
+      {
+        "message": "我知道你刚刚很认真。",
+        "focus_only": true,
+        "min_focus_elapsed": 20
       },
       {
         "message": "摸一下，就继续吧。",
@@ -115,9 +190,11 @@
   },
   "companion_focus_start": {
     "zh_CN": [
-      "开始啦，我会安静陪你。",
-      "你专注的时候，我就在旁边。",
-      "慢慢来，我不吵你。"
+      "我会安静陪你。",
+      "你专注，我守着。",
+      "开始了，慢慢来。",
+      "我就在旁边看着。",
+      "一点点推进就好。"
     ],
     "en_US": [
       "Let's begin. I'll stay quiet with you.",
@@ -128,8 +205,10 @@
   "companion_focus_end": {
     "zh_CN": [
       "辛苦了，先缓一口气。",
-      "这一段结束啦，做得很好。",
-      "你已经认真很久了。"
+      "这一段结束啦。",
+      "刚才很投入呢。",
+      "刚好告一段落。",
+      "歇一会儿吧。"
     ],
     "en_US": [
       "You did well. Breathe a little.",
@@ -144,11 +223,19 @@
         "night_only": true
       },
       {
+        "message": "屏幕的光在夜里很亮。",
+        "night_only": true
+      },
+      {
         "message": "已经很晚啦，别太勉强。",
         "night_only": true
       },
       {
-        "message": "外面安静下来了，这里也是。",
+        "message": "周围都安静下来了。",
+        "night_only": true
+      },
+      {
+        "message": "慢慢收尾吧。",
         "night_only": true
       }
     ],
@@ -170,21 +257,33 @@
   "companion_working": {
     "zh_CN": [
       {
-        "message": "今天也在和代码待着呢。",
+        "message": "代码一行行增加了。",
         "app_category": [
           "ide"
         ]
       },
       {
-        "message": "这一屏看起来很认真。",
+        "message": "逻辑在慢慢理清。",
         "app_category": [
           "ide"
         ]
       },
       {
-        "message": "又在慢慢打磨画面了。",
+        "message": "黑色的屏幕，很专注。",
         "app_category": [
-          "design"
+          "ide"
+        ]
+      },
+      {
+        "message": "不着急，慢慢跑。",
+        "app_category": [
+          "ide"
+        ]
+      },
+      {
+        "message": "一层层往下写，挺好的。",
+        "app_category": [
+          "ide"
         ]
       },
       {
@@ -194,13 +293,43 @@
         ]
       },
       {
-        "message": "今天也在安静处理事情。",
+        "message": "画布越来越丰富了。",
+        "app_category": [
+          "design"
+        ]
+      },
+      {
+        "message": "这一屏看起来很好看。",
+        "app_category": [
+          "design"
+        ]
+      },
+      {
+        "message": "一点点在变生动。",
+        "app_category": [
+          "design"
+        ]
+      },
+      {
+        "message": "一项一项来，也很好。",
         "app_category": [
           "office"
         ]
       },
       {
-        "message": "一项一项来，也很好。",
+        "message": "文字慢慢填满了。",
+        "app_category": [
+          "office"
+        ]
+      },
+      {
+        "message": "看着你把事情理顺。",
+        "app_category": [
+          "office"
+        ]
+      },
+      {
+        "message": "不用急，慢慢整。",
         "app_category": [
           "office"
         ]
@@ -247,9 +376,13 @@
   },
   "companion_idle_presence": {
     "zh_CN": [
-      "我在这儿，慢慢陪着你。",
-      "不用说话，也可以一起待着。",
-      "安安静静地过一会儿吧。"
+      "我就在这儿。",
+      "安静地待会儿。",
+      "不用管我，你忙你的。",
+      "这会儿挺安静的。",
+      "陪你发会儿呆。",
+      "不用说话也很好。",
+      "一点点流过的时间。"
     ],
     "en_US": [
       "I'm here, keeping you company.",
@@ -259,8 +392,10 @@
   },
   "companion_return": {
     "zh_CN": [
-      "回来啦，我刚刚还在等你。",
-      "又见面了，我在。",
+      "回来啦。",
+      "又见到你了。",
+      "我刚刚还在等你。",
+      "屏幕亮了，我也在。",
       "你回来了呀。"
     ],
     "en_US": [

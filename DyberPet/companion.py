@@ -157,6 +157,18 @@ class OfflineCompanion:
                 if hour is None or not self._hour_in_ranges(hour, time_range):
                     continue
 
+            min_focus_elapsed = entry.get("min_focus_elapsed")
+            if min_focus_elapsed is not None:
+                focus_elapsed_minutes = filters.get("focus_elapsed_minutes")
+                if focus_elapsed_minutes is None or focus_elapsed_minutes < min_focus_elapsed:
+                    continue
+
+            max_focus_elapsed = entry.get("max_focus_elapsed")
+            if max_focus_elapsed is not None:
+                focus_elapsed_minutes = filters.get("focus_elapsed_minutes")
+                if focus_elapsed_minutes is None or focus_elapsed_minutes > max_focus_elapsed:
+                    continue
+
             candidates.append(entry["message"])
 
         if not candidates:
@@ -192,6 +204,7 @@ class OfflineCompanion:
             context_type,
             app_category=filters.get("app_category"),
             focus_mode_active=filters.get("focus_mode_active", False),
+            focus_elapsed_minutes=filters.get("focus_elapsed_minutes"),
             quiet_hours_active=filters.get("quiet_hours_active", self._quiet_hours_active(now)),
             hour=now.hour,
         )
@@ -230,7 +243,7 @@ class OfflineCompanion:
             return None
         return self._build_bubble("companion_greeting", now=self._now())
 
-    def handle_patpat(self):
+    def handle_patpat(self, focus_elapsed_minutes=None):
         now = self._now()
         previous_interaction = self.last_user_interaction_at
         self.last_user_interaction_at = now
@@ -244,6 +257,7 @@ class OfflineCompanion:
                     "companion_return",
                     now=now,
                     focus_mode_active=settings.focus_timer_on,
+                    focus_elapsed_minutes=focus_elapsed_minutes,
                 )
 
         if self._context_cooldown_ok("companion_patpat", now):
@@ -251,6 +265,7 @@ class OfflineCompanion:
                 "companion_patpat",
                 now=now,
                 focus_mode_active=settings.focus_timer_on,
+                focus_elapsed_minutes=focus_elapsed_minutes,
             )
         return None
 
