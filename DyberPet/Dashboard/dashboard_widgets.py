@@ -10,9 +10,9 @@ from collections import defaultdict
 from typing import Union, List
 
 from PySide6 import QtGui
-from PySide6.QtCore import Qt, Signal, QPoint, QSize, QObject, QEvent, QModelIndex, QRectF, QRect, QTime
+from PySide6.QtCore import Qt, Signal, QPoint, QSize, QObject, QEvent, QModelIndex, QRectF, QRect, QTime, QDate
 from PySide6.QtWidgets import (QApplication, QWidget, QLabel, QPushButton, QHBoxLayout, 
-                             QVBoxLayout, QProgressBar, QFrame, QStyleOptionViewItem,
+                             QVBoxLayout, QProgressBar, QFrame, QStyleOptionViewItem, QDateEdit,
                              QSizePolicy, QStackedWidget, QLayout, QSpacerItem)
 from PySide6.QtGui import (QPixmap, QImage, QImageReader, QPainter, QBrush, QPen, QColor, QIcon,
                         QFont, QPainterPath, QCursor, QAction, QFontMetrics, QPalette, QMouseEvent)
@@ -3144,6 +3144,7 @@ class TaskPanel(CardWidget):
     """To-do Task Panel UI"""
 
     addCoins = Signal(int, bool, bool, str, name='addCoins')
+    taskReminderChanged = Signal(name='taskReminderChanged')
 
     def __init__(self, sizeHintDyber, parent=None):
         super().__init__(parent=parent)
@@ -3292,13 +3293,15 @@ class TaskPanel(CardWidget):
             settings.task_data.taskData['tasks_todo'][task_id] = task_text
             settings.task_data.save_data()
 
-        card = TaskCard(task_id, task_text)
+        reminder_info = settings.task_data.taskData['task_reminders'].get(task_id)
+        card = TaskCard(task_id, task_text, reminder_info=reminder_info)
         self.verticalLayout_1.insertWidget(2, card)
         self.taskCards[task_id] = card
         self.adjustSize()
 
         card.completed.connect(self._onTaskCompleted)
         card.deleted.connect(self._onTaskDeleted)
+        card.reminderChanged.connect(self._onTaskReminderChanged)
 
     def addDoneCard(self, task_text, task_id=None):
         if not task_id:
@@ -3316,6 +3319,7 @@ class TaskPanel(CardWidget):
         # change and save task data
         task_text = settings.task_data.taskData['tasks_todo'][task_id]
         del settings.task_data.taskData['tasks_todo'][task_id]
+        settings.task_data.taskData['task_reminders'].pop(task_id, None)
         settings.task_data.taskData['tasks_done'][task_id] = task_text
         settings.task_data.taskData['n_tasks'] += 1
         settings.task_data.save_data()
@@ -3340,6 +3344,7 @@ class TaskPanel(CardWidget):
         else:
             task_text = settings.task_data.taskData['tasks_todo'][task_id]
             del settings.task_data.taskData['tasks_todo'][task_id]
+            settings.task_data.taskData['task_reminders'].pop(task_id, None)
         settings.task_data.save_data()
 
         # move widget from todo to done
@@ -3347,6 +3352,15 @@ class TaskPanel(CardWidget):
         card.setParent(None)
         card.deleteLater()
         self.adjustSize()
+
+    def _onTaskReminderChanged(self, task_id, reminder_info):
+        reminders = settings.task_data.taskData['task_reminders']
+        if reminder_info:
+            reminders[task_id] = reminder_info
+        else:
+            reminders.pop(task_id, None)
+        settings.task_data.save_data()
+        self.taskReminderChanged.emit()
 
     def getReward(self):
         self.addCoins.emit(settings.SINGLETASK_REWARD, True, False, 
@@ -3365,8 +3379,9 @@ class TaskCard(SimpleCardWidget):
 
     completed = Signal(str, name='completed')
     deleted = Signal(str, bool, name='deleted')
+    reminderChanged = Signal(str, object, name='reminderChanged')
 
-    def __init__(self, task_id, text, done=False, parent=None):
+    def __init__(self, task_id, text, done=False, reminder_info=None, parent=None):
 
         super().__init__(parent)
         self.setBorderRadius(5)
@@ -3374,6 +3389,7 @@ class TaskCard(SimpleCardWidget):
         self.task_id = task_id
         self.task_text = text
         self.done = done
+        self.reminder_info = reminder_info or None
 
         self.hBoxLayout = QHBoxLayout(self)
         #self.hBoxLayout.setAlignment(Qt.AlignCenter)
@@ -3392,7 +3408,12 @@ class TaskCard(SimpleCardWidget):
         self.taskLabel = BodyLabel(self.task_text)
         self.taskLabel.setWordWrap(True)
         self.taskLabel.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.taskLabel.setMinimumWidth(320)
+        self.taskLabel.setMinimumWidth(0)
+        self.taskLabel.setMaximumWidth(240)
+        self.reminderLabel = CaptionLabel("")
+        self.reminderLabel.setWordWrap(True)
+        self.reminderLabel.setProperty("lightColor", QtGui.QColor(96, 96, 96))
+        self.reminderLabel.setProperty("darkColor", QtGui.QColor(186, 186, 186))
         if self.done:
             self._taskDone()
         self.checkBox.stateChanged.connect(self._checkClicked)
@@ -3408,17 +3429,36 @@ class TaskCard(SimpleCardWidget):
         self.deleteBtn.setIconSize(QSize(20,20))
         self.deleteBtn.clicked.connect(self._deleteClicked)
 
-        self.hBoxLayout.addWidget(self.checkBox, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        if not self.done:
+            self.reminderBtn = PushButton(self)
+            self.reminderBtn.setIcon(os.path.join(basedir, 'res/icons/bell.svg'))
+            self.reminderBtn.setText("提醒")
+            self.reminderBtn.setMinimumSize(96, 36)
+            self.reminderBtn.setMaximumSize(96, 36)
+            self.reminderBtn.setIconSize(QSize(18, 18))
+            self.reminderBtn.setCursor(Qt.PointingHandCursor)
+            self.reminderBtn.clicked.connect(self._showReminderMenu)
+            self._updateReminderToolTip()
+
+        self.hBoxLayout.addWidget(self.checkBox, 0, Qt.AlignLeft | Qt.AlignTop)
         spacerItem2 = QSpacerItem(5, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
         self.hBoxLayout.addItem(spacerItem2)
-        self.hBoxLayout.addWidget(self.taskLabel, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        spacerItem1 = QSpacerItem(5, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.textLayout = QVBoxLayout()
+        self.textLayout.setContentsMargins(0, 0, 0, 0)
+        self.textLayout.setSpacing(2)
+        self.textLayout.addWidget(self.taskLabel, 0, Qt.AlignLeft | Qt.AlignTop)
+        self.textLayout.addWidget(self.reminderLabel, 0, Qt.AlignLeft | Qt.AlignTop)
+        self.hBoxLayout.addLayout(self.textLayout, 1)
+        spacerItem1 = QSpacerItem(8, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
         self.hBoxLayout.addItem(spacerItem1)
 
         #self.hBoxLayout.addWidget(self.editBtn, 0, Qt.AlignRight | Qt.AlignVCenter)
         #spacerItem3 = QSpacerItem(5, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
         #self.hBoxLayout.addItem(spacerItem3)
-        self.hBoxLayout.addWidget(self.deleteBtn, 0, Qt.AlignRight | Qt.AlignVCenter)
+        if not self.done and hasattr(self, 'reminderBtn'):
+            self.hBoxLayout.addWidget(self.reminderBtn, 0, Qt.AlignRight | Qt.AlignTop)
+        self.hBoxLayout.addWidget(self.deleteBtn, 0, Qt.AlignRight | Qt.AlignTop)
+        self._updateReminderPresentation()
 
 
     def _checkClicked(self, state):
@@ -3430,6 +3470,8 @@ class TaskCard(SimpleCardWidget):
         self.done = True
         self.checkBox.setChecked(True)
         self.checkBox.setEnabled(False)
+        if hasattr(self, 'reminderBtn'):
+            self.reminderBtn.setVisible(False)
 
         self.taskLabel.setTextColor(QColor(140, 140, 140))
         font = self.taskLabel.font()
@@ -3441,6 +3483,167 @@ class TaskCard(SimpleCardWidget):
 
     def _deleteClicked(self):
         self.deleted.emit(self.task_id, self.done)
+
+    def _showReminderMenu(self):
+        menu = RoundMenu(parent=self)
+        menu.addAction(Action("5 分钟后再提醒", triggered=lambda: self._setReminderAfterMinutes(5)))
+        menu.addAction(Action("15 分钟后提醒", triggered=lambda: self._setReminderAfterMinutes(15)))
+        menu.addAction(Action("1 小时后提醒", triggered=lambda: self._setReminderAfterMinutes(60)))
+        menu.addAction(Action("明早 9 点提醒", triggered=self._setReminderTomorrowMorning))
+        menu.addAction(Action("自定义提醒", triggered=self._openCustomReminderDialog))
+        if self.reminder_info:
+            menu.addAction(Action("清除提醒", triggered=self._clearReminder))
+        menu.exec(self.reminderBtn.mapToGlobal(self.reminderBtn.rect().bottomLeft()))
+
+    def _setReminderAfterMinutes(self, minutes):
+        remind_at = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
+        self._applyReminder(remind_at)
+
+    def _setReminderTomorrowMorning(self):
+        now = datetime.datetime.now()
+        remind_at = (now + datetime.timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+        self._applyReminder(remind_at)
+
+    def _applyReminder(self, remind_at):
+        self.reminder_info = {
+            'remind_at': remind_at.isoformat(timespec='minutes'),
+            'repeat': 'once',
+        }
+        self._updateReminderPresentation()
+        self.reminderChanged.emit(self.task_id, self.reminder_info)
+
+    def _clearReminder(self):
+        self.reminder_info = None
+        self._updateReminderPresentation()
+        self.reminderChanged.emit(self.task_id, None)
+
+    def _openCustomReminderDialog(self):
+        dialog_parent = self.window() if self.window() is not None else self
+        dialog = TaskReminderDialog(self.reminder_info, dialog_parent)
+        dialog.yesButton.setText("保存")
+        dialog.cancelButton.setText("取消")
+        if dialog.exec():
+            self.reminder_info = dialog.getReminderInfo()
+            self._updateReminderPresentation()
+            self.reminderChanged.emit(self.task_id, self.reminder_info)
+
+    def _updateReminderToolTip(self):
+        if not hasattr(self, 'reminderBtn'):
+            return
+        if not self.reminder_info:
+            self.reminderBtn.setToolTip("设置提醒")
+            return
+        self.reminderBtn.setToolTip(self._formatReminderSummary(short=True))
+
+    def _updateReminderPresentation(self):
+        self._updateReminderToolTip()
+        if not hasattr(self, 'reminderLabel'):
+            return
+        summary = self._formatReminderSummary(short=False)
+        self.reminderLabel.setText(summary)
+        self.reminderLabel.setVisible(bool(summary))
+
+    def _formatReminderSummary(self, short=False):
+        if not self.reminder_info:
+            return ""
+        remind_at_raw = self.reminder_info.get('remind_at')
+        if not remind_at_raw:
+            return ""
+        try:
+            remind_at = datetime.datetime.fromisoformat(remind_at_raw)
+        except ValueError:
+            return ""
+        repeat = self.reminder_info.get('repeat', 'once')
+        repeat_map = {
+            'once': "单次",
+            'daily': "每天",
+            'workday': "工作日",
+            'weekly': "每周",
+        }
+        timestamp = remind_at.strftime("%Y-%m-%d %H:%M")
+        if short:
+            return "提醒时间：" + timestamp
+        return "提醒时间：" + timestamp + " | " + repeat_map.get(repeat, repeat_map['once'])
+
+
+class TaskReminderDialog(MessageBoxBase):
+    def __init__(self, reminder_info=None, parent=None):
+        actual_parent = parent or QApplication.activeWindow()
+        super().__init__(actual_parent)
+        self.reminder_info = reminder_info or {}
+
+        self.titleLabel = SubtitleLabel("待办提醒", self)
+        self.dateEdit = QDateEdit(self)
+        self.dateEdit.setCalendarPopup(True)
+        self.dateEdit.setDisplayFormat("yyyy-MM-dd")
+        self.timePicker = TimePicker(self)
+        self.timePicker.setSecondVisible(False)
+        self.repeatLabel = BodyLabel("重复", self)
+        self.repeatCombo = ComboBox(self)
+
+        for text in ["单次", "每天", "工作日", "每周"]:
+            self.repeatCombo.addItem(text)
+
+        self.hintLabel = CaptionLabel(self)
+        self.hintLabel.setWordWrap(True)
+        self.hintLabel.setProperty("lightColor", QtGui.QColor(96, 96, 96))
+        self.hintLabel.setProperty("darkColor", QtGui.QColor(186, 186, 186))
+
+        self.viewLayout.addWidget(self.titleLabel)
+        self.viewLayout.addWidget(self.dateEdit)
+        self.viewLayout.addWidget(self.timePicker)
+        self.viewLayout.addWidget(self.repeatLabel)
+        self.viewLayout.addWidget(self.repeatCombo)
+        self.viewLayout.addWidget(self.hintLabel)
+
+        self.widget.setMinimumWidth(360)
+        self._initValue()
+        self.dateEdit.dateChanged.connect(self._refreshHint)
+        self.timePicker.timeChanged.connect(self._refreshHint)
+        self.repeatCombo.currentIndexChanged.connect(self._refreshHint)
+
+    def _initValue(self):
+        now = datetime.datetime.now() + datetime.timedelta(hours=1)
+        remind_at_raw = self.reminder_info.get('remind_at')
+        if remind_at_raw:
+            try:
+                now = datetime.datetime.fromisoformat(remind_at_raw)
+            except ValueError:
+                pass
+        self.dateEdit.setDate(QDate(now.year, now.month, now.day))
+        self.timePicker.setTime(QTime(now.hour, now.minute))
+
+        repeat = self.reminder_info.get('repeat', 'once')
+        repeat_index = {'once': 0, 'daily': 1, 'workday': 2, 'weekly': 3}.get(repeat, 0)
+        self.repeatCombo.setCurrentIndex(repeat_index)
+        self._refreshHint()
+
+    def _refreshHint(self):
+        remind_at = self.getReminderDateTime()
+        repeat_text = self.repeatCombo.currentText()
+        self.hintLabel.setText("下次提醒：" + remind_at.strftime("%Y-%m-%d %H:%M") + " | " + repeat_text)
+
+    def getReminderDateTime(self):
+        date = self.dateEdit.date()
+        time_value = self.timePicker.time
+        if callable(time_value):
+            time_value = time_value()
+        return datetime.datetime(
+            date.year(),
+            date.month(),
+            date.day(),
+            time_value.hour(),
+            time_value.minute(),
+        )
+
+    def getReminderInfo(self):
+        remind_at = self.getReminderDateTime()
+        repeat_keys = ['once', 'daily', 'workday', 'weekly']
+        repeat_key = repeat_keys[self.repeatCombo.currentIndex()]
+        return {
+            'remind_at': remind_at.isoformat(timespec='minutes'),
+            'repeat': repeat_key,
+        }
 
 
 
