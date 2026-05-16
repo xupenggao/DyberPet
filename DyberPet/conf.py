@@ -1186,6 +1186,7 @@ class TaskData:
                 'goal_completed': False,
                 'n_days': 0,
                 'tasks_todo': {},
+                'task_reminders': {},
                 'tasks_done': {},
                 'n_tasks': 0}
 

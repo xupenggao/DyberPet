@@ -6,6 +6,8 @@ import types
 import random
 import inspect
 import webbrowser
+import datetime as dt
+import copy
 from typing import List
 from pathlib import Path
 import pynput.mouse as mouse
@@ -446,10 +448,14 @@ class PetWidget(QWidget):
         self.active_window_phase_timer = QElapsedTimer()
         self.active_window_phase_duration = 0
         self._excursion_interaction_paused = False
+        self.last_task_reminder_at = None
         self.offline_companion = OfflineCompanion()
         self.companion_timer = QTimer(self)
         self.companion_timer.setInterval(60 * 1000)
         self.companion_timer.timeout.connect(self._poll_companion_bubble)
+        self.todo_reminder_timer = QTimer(self)
+        self.todo_reminder_timer.setInterval(60 * 1000)
+        self.todo_reminder_timer.timeout.connect(self._poll_task_reminders)
 
         # 定期将桌宠提到最前，防止被其他窗口覆盖
         self._topmost_timer = QTimer(self)
@@ -468,6 +474,7 @@ class PetWidget(QWidget):
         self._setup_ui()
         self._setup_active_window_tracking()
         self.companion_timer.start()
+        self.todo_reminder_timer.start()
 
         # 开始动画模块和交互模块
         self.threads = {}
@@ -1753,17 +1760,113 @@ class PetWidget(QWidget):
             return
         self.register_bubbleText(bubble_dict)
 
+    def _emit_task_reminder(self, task_text):
+        self.last_task_reminder_at = dt.datetime.now()
+        bubble_dict = {
+            'bubble_type': 'task_reminder',
+            'icon': 'bb_companion_idle_presence',
+            'message': self._build_task_reminder_message(task_text),
+            'start_audio': 'system',
+            'end_audio': None,
+            'timeout': 18,
+        }
+        self._emit_companion_bubble(bubble_dict)
+        self.register_notification('system', self.tr("待办提醒：") + task_text + self.tr("（可在待办面板中选择 5 分钟后再提醒）"))
+
     def _current_companion_surface(self):
         if self.active_window_surface is not None:
             return self.active_window_surface
         return self.active_window_tracker.get_surface()
 
     def _poll_companion_bubble(self):
+        if self.last_task_reminder_at and (dt.datetime.now() - self.last_task_reminder_at).total_seconds() < 20:
+            return
         companion_bubble = self.offline_companion.get_proactive_bubble(
             surface=self._current_companion_surface()
         )
         if companion_bubble:
             self._emit_companion_bubble(companion_bubble)
+
+    def _poll_task_reminders(self):
+        reminders = settings.task_data.taskData.get('task_reminders', {})
+        tasks_todo = settings.task_data.taskData.get('tasks_todo', {})
+        if not reminders or not tasks_todo:
+            return
+
+        now = dt.datetime.now()
+        updated = False
+        stale_task_ids = []
+
+        for task_id, reminder_info in reminders.items():
+            if task_id not in tasks_todo:
+                stale_task_ids.append(task_id)
+                updated = True
+                continue
+
+            if not isinstance(reminder_info, dict):
+                stale_task_ids.append(task_id)
+                updated = True
+                continue
+
+            remind_at_raw = reminder_info.get('remind_at')
+            if not remind_at_raw:
+                stale_task_ids.append(task_id)
+                updated = True
+                continue
+
+            try:
+                remind_at = dt.datetime.fromisoformat(remind_at_raw)
+            except ValueError:
+                stale_task_ids.append(task_id)
+                updated = True
+                continue
+
+            if remind_at > now:
+                continue
+
+            task_text = tasks_todo.get(task_id, '').strip()
+            if not task_text:
+                stale_task_ids.append(task_id)
+                updated = True
+                continue
+
+            self._emit_task_reminder(task_text)
+            next_remind_at = self._next_task_reminder_time(remind_at, reminder_info.get('repeat', 'once'))
+            if next_remind_at is None:
+                stale_task_ids.append(task_id)
+            else:
+                reminder_info['remind_at'] = next_remind_at.isoformat(timespec='minutes')
+            updated = True
+
+        for task_id in stale_task_ids:
+            reminders.pop(task_id, None)
+
+        if updated:
+            settings.task_data.save_data()
+
+    def _build_task_reminder_message(self, task_text):
+        templates = [
+            self.tr("该做这个待办啦：{task}"),
+            self.tr("我来轻轻提醒你一下：{task}"),
+            self.tr("先把这件事推进一点点吧：{task}"),
+            self.tr("别忘了这件待办哦：{task}"),
+            self.tr("现在也许适合看一眼这个：{task}"),
+        ]
+        return random.choice(templates).format(task=task_text)
+
+    def _next_task_reminder_time(self, remind_at, repeat):
+        if repeat == 'once':
+            return None
+        if repeat == 'daily':
+            return remind_at + dt.timedelta(days=1)
+        if repeat == 'weekly':
+            return remind_at + dt.timedelta(days=7)
+        if repeat == 'workday':
+            next_time = remind_at + dt.timedelta(days=1)
+            while next_time.weekday() >= 5:
+                next_time += dt.timedelta(days=1)
+            return next_time
+        return None
 
     def register_accessory(self, accs):
         self.setup_acc.emit(accs, self.pos().x()+self.width()//2, self.pos().y()+self.height())
