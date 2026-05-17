@@ -348,5 +348,65 @@ def replace_duplicates_in_list(lst):
             # Otherwise, keep the number and mark it as seen
             result.append(num)
             seen.add(num)
-    
+
     return result
+
+
+def is_autostart_enabled():
+    """Check if auto-start is enabled via Windows registry."""
+    if platform.system() != 'Windows':
+        return False
+    try:
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                             r'Software\Microsoft\Windows\CurrentVersion\Run',
+                             0, winreg.KEY_READ)
+        try:
+            winreg.QueryValueEx(key, 'DyberPet')
+            return True
+        except FileNotFoundError:
+            return False
+        finally:
+            winreg.CloseKey(key)
+    except Exception:
+        return False
+
+
+def set_autostart(enabled, exe_path=None):
+    """Set or remove auto-start in Windows registry.
+
+    Args:
+        enabled: True to add, False to remove.
+        exe_path: Path to the executable. If None, uses sys.executable.
+    """
+    if platform.system() != 'Windows':
+        return False
+    try:
+        import winreg
+        import sys
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                             r'Software\Microsoft\Windows\CurrentVersion\Run',
+                             0, winreg.KEY_SET_VALUE)
+        try:
+            if enabled:
+                if exe_path is None:
+                    exe_path = sys.executable
+                # If running as python script, find the project's run entry
+                if exe_path.endswith('python.exe') or exe_path.endswith('pythonw.exe'):
+                    import DyberPet.settings as settings
+                    basedir = settings.BASEDIR
+                    run_script = os.path.join(basedir, 'run_DyberPet.py') if basedir else 'run_DyberPet.py'
+                    exe_path = f'"{sys.executable}" "{os.path.abspath(run_script)}"'
+                else:
+                    exe_path = f'"{exe_path}"'
+                winreg.SetValueEx(key, 'DyberPet', 0, winreg.REG_SZ, exe_path)
+            else:
+                try:
+                    winreg.DeleteValue(key, 'DyberPet')
+                except FileNotFoundError:
+                    pass
+            return True
+        finally:
+            winreg.CloseKey(key)
+    except Exception:
+        return False
