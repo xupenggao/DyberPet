@@ -180,6 +180,13 @@ def init():
         pets = [default_pet] + pets
     save_settings()
 
+    # Sync auto-start with registry
+    try:
+        from DyberPet.utils import set_autostart
+        set_autostart(auto_start)
+    except Exception:
+        pass
+
     # Focus Timer
     global focus_timer_on
     focus_timer_on = False
@@ -223,7 +230,8 @@ def init_settings():
     global gravity, fixdragspeedx, fixdragspeedy, tunable_scale, scale_dict, volume, \
            language_code, on_top_hint, default_pet, defaultAct, themeColor, minipet_scale, \
            toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, walk_only, act_speed, \
-           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency
+           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency, \
+           auto_start
 
     # check json file integrity
     try:
@@ -338,6 +346,9 @@ def init_settings():
         global act_speed
         act_speed = data_params.get('act_speed', {})
 
+        # Auto start on boot
+        auto_start = data_params.get('auto_start', True)
+
     else:
         fixdragspeedx, fixdragspeedy = 1.0, 1.0
         gravity = 0.4
@@ -368,6 +379,7 @@ def init_settings():
         ai_api_key = ''
         ai_api_base = 'https://ark.cn-beijing.volces.com/api/v3'
         act_speed = {}
+        auto_start = True
     check_locale()
     save_settings()
 
@@ -375,7 +387,8 @@ def save_settings():
     global file_path, set_fall, gravity, fixdragspeedx, fixdragspeedy, scale_dict, volume, \
            language_code, on_top_hint, default_pet, defaultAct, themeColor, minipet_scale, \
            toaster_on, usertag_dict, auto_lock, bubble_on, walk_on_active_window, walk_only, ai_api_key, ai_api_base, act_speed, \
-           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency
+           companion_enabled, companion_proactive, companion_contextual, companion_night, companion_frequency, \
+           auto_start
 
     data_js = {'gravity':gravity,
                'set_fall': set_fall,
@@ -402,7 +415,8 @@ def save_settings():
                'companion_frequency':companion_frequency,
                'ai_api_key':ai_api_key,
                'ai_api_base':ai_api_base,
-               'act_speed':act_speed
+               'act_speed':act_speed,
+               'auto_start':auto_start
                }
 
     with open(file_path, 'w', encoding='utf-8') as f:

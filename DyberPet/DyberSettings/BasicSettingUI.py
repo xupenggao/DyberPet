@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QWidget, QLabel, QApplication, QSizePolicy, QDialo
 
 from .custom_utils import Dyber_RangeSettingCard, Dyber_ComboBoxSettingCard, CustomColorSettingCard
 import DyberPet.settings as settings
+from DyberPet.utils import is_autostart_enabled, set_autostart
 from DyberPet.updater import check_update, download_update, prepare_update, launch_updater
 
 basedir = settings.BASEDIR
@@ -128,6 +129,18 @@ class SettingInterface(ScrollArea):
         self.AutoLockCard.switchButton.checkedChanged.connect(self._AutoLockChanged)
         if platform != 'win32':
             self.AutoLockCard.switchButton.indicator.setEnabled(False)
+
+        # Auto-start on boot
+        self.AutoStartCard = SwitchSettingCard(
+            FIF.POWER_BUTTON,
+            self.tr("开机自启"),
+            self.tr("系统启动时自动运行 DyberPet（仅支持 Windows）"),
+            parent=self.ModeGroup
+        )
+        self.AutoStartCard.setChecked(settings.auto_start)
+        self.AutoStartCard.switchButton.checkedChanged.connect(self._AutoStartChanged)
+        if platform != 'win32':
+            self.AutoStartCard.switchButton.indicator.setEnabled(False)
 
 
         # Interaction parameters =======================================================================
@@ -329,6 +342,7 @@ class SettingInterface(ScrollArea):
         self.ModeGroup.addSettingCard(self.WalkOnWindowCard)
         self.ModeGroup.addSettingCard(self.WalkOnlyCard)
         self.ModeGroup.addSettingCard(self.AutoLockCard)
+        self.ModeGroup.addSettingCard(self.AutoStartCard)
 
         self.InteractionGroup.addSettingCard(self.GravityCard)
         self.InteractionGroup.addSettingCard(self.DragCard)
@@ -413,6 +427,15 @@ class SettingInterface(ScrollArea):
             settings.auto_lock = True
         else:
             settings.auto_lock = False
+        settings.save_settings()
+
+    def _AutoStartChanged(self, isChecked):
+        if isChecked:
+            settings.auto_start = True
+            set_autostart(True)
+        else:
+            settings.auto_start = False
+            set_autostart(False)
         settings.save_settings()
 
     def _GravityChanged(self, value):
