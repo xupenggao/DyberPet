@@ -104,6 +104,7 @@ class CharInterface(ScrollArea):
         self.__initCardLayout()
 
         self.__initWidget()
+        self.refresh_language()
 
     def __initCardLayout(self):
 
@@ -526,7 +527,16 @@ For most of time, App can import the character for you automatically. But in any
 
         layout = QVBoxLayout(dialog)
 
-        titleLabel = QLabel(self.tr("微信二维码"))
+        if settings.language_code.startswith('zh'):
+            title_text = "微信二维码"
+            hint_text = "扫码添加微信"
+            error_text = "二维码图片未找到"
+        else:
+            title_text = "WeChat QR Code"
+            hint_text = "Scan to add WeChat"
+            error_text = "QR code image not found"
+
+        titleLabel = QLabel(title_text)
         titleLabel.setAlignment(Qt.AlignCenter)
         setFont(titleLabel, 16, QFont.DemiBold)
         layout.addWidget(titleLabel)
@@ -540,16 +550,24 @@ For most of time, App can import the character for you automatically. But in any
             imgLabel.setAlignment(Qt.AlignCenter)
             layout.addWidget(imgLabel, 0, Qt.AlignCenter)
 
-            hintLabel = QLabel(self.tr("扫码添加微信"))
+            hintLabel = QLabel(hint_text)
             hintLabel.setAlignment(Qt.AlignCenter)
             layout.addWidget(hintLabel)
         else:
-            errorLabel = QLabel(self.tr("QR code image not found"))
+            errorLabel = QLabel(error_text)
             errorLabel.setAlignment(Qt.AlignCenter)
             layout.addWidget(errorLabel)
 
         dialog.exec()
-        
+
+    def refresh_contact_author(self):
+        if settings.language_code.startswith('zh'):
+            self.contactAuthorBtn.setText("联系作者")
+        else:
+            self.contactAuthorBtn.setText("Contact Author")
+
+    def refresh_language(self):
+        self.refresh_contact_author()
 
     def __showMessageBox(self, title, content, yesText='OK', cancelText=None):
 

@@ -324,6 +324,26 @@ class ActDesignWindow(QWidget):
         cnct_icon.setFixedWidth(10)
         return cnct_icon
 
+    def refresh_language(self):
+        self.title.setText(self.tr("Animation Design"))
+        self.actComboBox.setPlaceholderText(self.tr("Select an action"))
+        labels = [
+            self.tr("Start:"),
+            self.tr("End:"),
+            self.tr("Repeat:"),
+        ]
+        for row, label in enumerate(labels):
+            item = self.verticalLayout_2.itemAt(row * 2)
+            if item and item.layout() and item.layout().count():
+                item.layout().itemAt(0).widget().setText(label)
+        self.saveBtn.setText(self.tr("Add"))
+        self.deleteBtn.setText(self.tr("Delete"))
+        self.init_actBtn.setText(self.tr("Add New"))
+        self.nameEdit.setPlaceholderText(self.tr("New Action Name"))
+        self.HPLabel.setText(self.tr("HP Level:"))
+        self.confirmBtn.setText(self.tr("Create"))
+        self.cancelBtn.setText(self.tr("Cancel"))
+
     def mousePressEvent(self, event):
         """
         鼠标点击事件

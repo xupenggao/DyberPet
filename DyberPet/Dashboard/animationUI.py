@@ -219,5 +219,8 @@ Once done, give the design a name, and click 'Create' to complete""")
         self.__showMessageBox(title, content)
         return
 
-            
+    def refresh_language(self):
+        self.panelLabel.setText(self.tr("Animation"))
+        self._showInstruction()
 
+            

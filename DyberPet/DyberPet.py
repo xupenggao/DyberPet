@@ -913,6 +913,10 @@ class PetWidget(QWidget):
         #self.menu = menu
         #self.menu.addAction(Action(FIF.POWER_BUTTON, self.tr('Exit'), triggered=self.quit))
 
+    def refresh_language(self):
+        self._set_menu(self.pets)
+        self._set_Statusmenu()
+
 
     def _update_fvlock(self):
 

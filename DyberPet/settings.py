@@ -42,7 +42,8 @@ RELEASE_URL = "https://github.com/xupenggao/petupdate/releases"
 UPDATE_NEEDED = False
 
 HP_TIERS = [0,50,80,100]
-TIER_NAMES = ['Starving', 'Hungry', 'Normal', 'Energetic']
+BASE_TIER_NAMES = ['Starving', 'Hungry', 'Normal', 'Energetic']
+TIER_NAMES = BASE_TIER_NAMES.copy()
 HP_INTERVAL = 2
 LVL_BAR_V1 = [20, 120, 300, 600, 1200, 1800, 2400, 3200]
 LVL_BAR = [20] + [120]*200
@@ -64,8 +65,10 @@ FIVETASK_REWARD = 1500
 # Multiply HP and FV effect if item is required by bubble `feed_required`
 FACTOR_FEED_REQ = 5
 
-HUNGERSTR = "Satiety"
-FAVORSTR = "Favorability"
+BASE_HUNGERSTR = "Satiety"
+BASE_FAVORSTR = "Favorability"
+HUNGERSTR = BASE_HUNGERSTR
+FAVORSTR = BASE_FAVORSTR
 
 LINK_PERMIT = {"BiliBili":"https://space.bilibili.com/",
                "微博":"https://m.weibo.cn/profile/",
@@ -441,21 +444,47 @@ def get_petlist(dirname):
     return pets
 
 def change_translator(language_code):
-    global translator
-    if language_code == 'en_US':
-        translator = None
-    else:
-        translator = QtCore.QTranslator()
-        translator.load(QtCore.QLocale(language_code), "langs", ".", os.path.join(basedir, "res/language/"))
+    global translator, TIER_NAMES, HUNGERSTR, FAVORSTR
+    language_code = check_locale()
 
-        global TIER_NAMES, HUNGERSTR, FAVORSTR
-        TIER_NAMES = [translator.translate("others", i) for i in TIER_NAMES] #.encode('utf-8')
-        HUNGER_trans = translator.translate("others", HUNGERSTR) #.encode('utf-8'))
+    TIER_NAMES = BASE_TIER_NAMES.copy()
+    HUNGERSTR = BASE_HUNGERSTR
+    FAVORSTR = BASE_FAVORSTR
+
+    translator = QtCore.QTranslator()
+    if language_code != 'en_US':
+        translator.load(QtCore.QLocale(language_code), "langs", ".", os.path.join(basedir, "res/language/"))
+        if translator.isEmpty():
+            translator = QtCore.QTranslator()
+            return
+
+        TIER_NAMES = [translator.translate("others", i) or i for i in BASE_TIER_NAMES]
+        HUNGER_trans = translator.translate("others", BASE_HUNGERSTR)
         if HUNGER_trans:
             HUNGERSTR = HUNGER_trans
-        FAVOR_trans = translator.translate("others", FAVORSTR) #.encode('utf-8'))
+        FAVOR_trans = translator.translate("others", BASE_FAVORSTR)
         if FAVOR_trans:
             FAVORSTR = FAVOR_trans
+
+
+def get_localized_text(text_map, language=None, default=''):
+    if not isinstance(text_map, dict):
+        return text_map if text_map is not None else default
+    language = language or language_code
+    if language in text_map and text_map[language]:
+        return text_map[language]
+    if 'default' in text_map and text_map['default']:
+        return text_map['default']
+    for value in text_map.values():
+        if value:
+            return value
+    return default
+
+
+def rebuild_items_data():
+    global items_data
+    items_data = ItemData(HUNGERSTR=HUNGERSTR, FAVORSTR=FAVORSTR)
+    return items_data
 
 def check_locale():
     global language_code, lang_dict
@@ -464,6 +493,7 @@ def check_locale():
             language_code = "zh_CN"
         else:
             language_code = "en_US"
+    return language_code
             
 
 def check_dict_datatype(raw_dict:dict, dtype, default_value):

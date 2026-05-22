@@ -783,6 +783,9 @@ class coinWidget(QWidget):
         self.coinAmount.setText(num_str)
         self.coinAmount.setFixedWidth(len(num_str)*7 + 29)
 
+    def refresh_language(self):
+        self._updateCoinUI()
+
 
 
 
@@ -979,6 +982,10 @@ class PetItemWidget(QLabel):
         self.cell_index = idx
         self._setQss(self.item_type)
 
+    def refresh_language(self):
+        if self.item_config is not None:
+            self.setToolTip(self.item_config['hint'])
+
 
 
 class itemTabWidget(QWidget):
@@ -1090,6 +1097,11 @@ class itemTabWidget(QWidget):
         self._clear_cardlayout(self.cardLayout)
         # load in new items
         self._init_items()
+
+    def refresh_language(self):
+        for idx, cell in self.cells_dict.items():
+            cell.refresh_language()
+        self.changeButton(self.cells_dict[self.selected_cell].item_inuse if self.selected_cell is not None else False)
 
     def check_num_cells(self):
         n_cells = self.count()
@@ -1897,6 +1909,16 @@ class ShopView(QWidget):
         for idx, card in self.cards.items():
             card._update_UI()
 
+    def refresh_language(self):
+        self.filterDict = {self.tr('Type'): defaultdict(list),
+                           self.tr('MOD'): defaultdict(list)}
+        self.conf2uiMap = {'consumable': self.tr('Food'),
+                           'collection': self.tr('Collection'),
+                           'dialogue': self.tr('Collection'),
+                           'subpet': self.tr('Pet')}
+        for idx, card in self.cards.items():
+            card._update_UI()
+
     def _fvchange(self, fv_lvl):
         for idx, card in self.cards.items():
             if fv_lvl >= card.fv_lock and not card.unlocked and card.locked_reason == 'FVLOCK':
@@ -1950,7 +1972,7 @@ class filterView(SimpleCardWidget):
 
     def addFilter(self, title: str, options: List):
 
-        titleW = CaptionLabel(title)
+        titleW = CaptionLabel(self.tr(title))
         setFont(titleW, 15, QFont.DemiBold)
         #titleW.adjustSize()
         #titleW.setFixedHeight(25)
@@ -1985,6 +2007,11 @@ class filterView(SimpleCardWidget):
 
         return selectedTags
 
+    def refresh_language(self):
+        for title, widget in self.filter_dict.items():
+            if hasattr(widget, "refresh_language"):
+                widget.refresh_language()
+
     
 
 
@@ -2012,7 +2039,7 @@ class filterWidget(QWidget):
 
     def _init_opts(self):
         for opt in self.options:
-            btn = PillPushButton(opt)
+            btn = PillPushButton(self.tr(opt))
             self.cardLayout.addWidget(btn)
             self.opt_btn.append(btn)
             btn.adjustSize()
@@ -2041,6 +2068,10 @@ class filterWidget(QWidget):
                 nrow += 1
 
         return nrow
+
+    def refresh_language(self):
+        for btn, opt in zip(self.opt_btn, self.options):
+            btn.setText(self.tr(opt))
 
 
 

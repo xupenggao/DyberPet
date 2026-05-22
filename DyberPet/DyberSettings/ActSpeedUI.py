@@ -1,4 +1,4 @@
-# coding:utf-8
+﻿# coding:utf-8
 import json
 import os
 
@@ -18,27 +18,51 @@ basedir = settings.BASEDIR
 _HIDDEN_ACTIONS = {"default", "up", "down", "left", "right"}
 
 _ACTION_LABELS = {
+    "default":     "Idle",
+    "up":          "Idle (Up)",
+    "down":        "Idle (Down)",
+    "left":        "Idle (Left)",
+    "right":       "Idle (Right)",
+    "stand":       "Idle",
+    "left_walk":   "Walk Left",
+    "right_walk":  "Walk Right",
+    "leftwalk":    "Walk Left",
+    "rightwalk":   "Walk Right",
+    "fall_asleep": "Fall Asleep",
+    "sleep":       "Sleep",
+    "drag":        "Dragged",
+    "fall":        "Fall",
+    "onfloor":     "On Floor",
+    "angry":       "Angry",
+    "heart":       "Heart",
+    "sit":         "Sit",
+    "lie":         "Lie Down",
+    "patpat":      "Pat",
+    "prefall":     "Pre-fall",
+}
+
+_ACTION_LABELS_ZH = {
     "default":     "待机",
-    "up":          "待机(上)",
-    "down":        "待机(下)",
-    "left":        "待机(左)",
-    "right":       "待机(右)",
+    "up":          "待机（上）",
+    "down":        "待机（下）",
+    "left":        "待机（左）",
+    "right":       "待机（右）",
     "stand":       "待机",
-    "left_walk":   "向左行走",
-    "right_walk":  "向右行走",
-    "leftwalk":    "向左行走",
-    "rightwalk":   "向右行走",
+    "left_walk":   "向左走",
+    "right_walk":  "向右走",
+    "leftwalk":    "向左走",
+    "rightwalk":   "向右走",
     "fall_asleep": "入睡",
     "sleep":       "睡觉",
     "drag":        "被拖拽",
-    "fall":        "掉落",
+    "fall":        "下落",
     "onfloor":     "落地",
     "angry":       "生气",
     "heart":       "爱心",
     "sit":         "坐下",
-    "lie":         "趴下",
-    "patpat":      "被摸头",
-    "prefall":     "下落预备",
+    "lie":         "躺下",
+    "patpat":      "抚摸",
+    "prefall":     "预落下",
 }
 
 
@@ -59,13 +83,13 @@ class ActSpeedCard(QWidget):
         layout.setContentsMargins(16, 6, 16, 6)
         layout.setSpacing(8)
 
-        name_label = QLabel(display_name, self)
-        name_label.setFixedWidth(80)
-        layout.addWidget(name_label)
+        self.nameLabel = QLabel(display_name, self)
+        self.nameLabel.setFixedWidth(80)
+        layout.addWidget(self.nameLabel)
 
-        speed_label = QLabel(self.tr("速度"), self)
-        speed_label.setFixedWidth(30)
-        layout.addWidget(speed_label)
+        self.speedLabel = QLabel(self.tr("Speed"), self)
+        self.speedLabel.setFixedWidth(30)
+        layout.addWidget(self.speedLabel)
 
         self.speed_slider = Slider(Qt.Horizontal, self)
         self.speed_slider.setRange(25, 400)
@@ -80,9 +104,9 @@ class ActSpeedCard(QWidget):
         )
 
         if has_move:
-            move_label = QLabel(self.tr("移动"), self)
-            move_label.setFixedWidth(30)
-            layout.addWidget(move_label)
+            self.moveLabel = QLabel(self.tr("Move"), self)
+            self.moveLabel.setFixedWidth(30)
+            layout.addWidget(self.moveLabel)
 
             self.move_slider = Slider(Qt.Horizontal, self)
             self.move_slider.setRange(25, 400)
@@ -96,11 +120,11 @@ class ActSpeedCard(QWidget):
                 lambda value: self.move_value.setText(f"{value / 100:.2f}x")
             )
 
-        reset_btn = PushButton(self.tr("重置"), self)
-        reset_btn.setFixedSize(60, 33)
-        reset_btn.setToolTip(self.tr("恢复默认速度"))
-        reset_btn.clicked.connect(self._reset)
-        layout.addWidget(reset_btn)
+        self.resetBtn = PushButton(self.tr("Reset"), self)
+        self.resetBtn.setFixedSize(60, 33)
+        self.resetBtn.setToolTip(self.tr("Restore default speed"))
+        self.resetBtn.clicked.connect(self._reset)
+        layout.addWidget(self.resetBtn)
 
     def sizeHint(self):
         return QSize(0, 50)
@@ -122,6 +146,22 @@ class ActSpeedCard(QWidget):
         if self.has_move and "move" in data:
             self.move_slider.setValue(int(data["move"] * 100))
 
+    def refresh_language(self):
+        if settings.language_code.startswith("zh"):
+            self.nameLabel.setText(_ACTION_LABELS_ZH.get(self.act_name, self.act_name))
+            self.speedLabel.setText("速度")
+            if self.has_move:
+                self.moveLabel.setText("移动")
+            self.resetBtn.setText("重置")
+            self.resetBtn.setToolTip("恢复默认速度")
+        else:
+            self.nameLabel.setText(_ACTION_LABELS.get(self.act_name, self.act_name))
+            self.speedLabel.setText("Speed")
+            if self.has_move:
+                self.moveLabel.setText("Move")
+            self.resetBtn.setText("Reset")
+            self.resetBtn.setToolTip("Restore default speed")
+
 
 class ActSpeedInterface(ScrollArea):
     """Action speed settings page"""
@@ -133,7 +173,7 @@ class ActSpeedInterface(ScrollArea):
 
         self.scrollWidget = QWidget()
         self.expandLayout = ExpandLayout(self.scrollWidget)
-        self.titleLabel = QLabel(self.tr("动作速度"), self)
+        self.titleLabel = QLabel(self.tr("Action Speed"), self)
         self.act_cards = {}
 
         pet_list = settings.pets
@@ -141,8 +181,8 @@ class ActSpeedInterface(ScrollArea):
             pet_list,
             pet_list,
             QIcon(os.path.join(basedir, "res/icons/system/homestar.svg")),
-            self.tr("选择角色"),
-            self.tr("选择要调整动作速度的角色"),
+            self.tr("Choose character"),
+            self.tr("Choose the character whose action speed you want to adjust"),
             parent=self.scrollWidget,
         )
         self.petSelector.comboBox.currentTextChanged.connect(self._on_pet_changed)
@@ -154,12 +194,12 @@ class ActSpeedInterface(ScrollArea):
             _forward_target._toggleComboMenu(),
         )
 
-        self.saveBtn = PrimaryPushButton(self.tr("保存"), self.scrollWidget)
+        self.saveBtn = PrimaryPushButton(self.tr("Save"), self.scrollWidget)
         self.saveBtn.setFixedWidth(100)
         self.saveBtn.clicked.connect(self._on_save)
 
         self.speedGroup = SettingCardGroup(
-            self.tr("动作速度设置"), self.scrollWidget
+            self.tr("Action Speed Settings"), self.scrollWidget
         )
 
         self.__initWidget()
@@ -197,13 +237,18 @@ class ActSpeedInterface(ScrollArea):
     def _on_pet_changed(self, pet_name):
         self._load_pet(pet_name)
 
+    def _get_action_label(self, act_name):
+        if settings.language_code.startswith("zh"):
+            return _ACTION_LABELS_ZH.get(act_name, act_name)
+        return _ACTION_LABELS.get(act_name, act_name)
+
     def _load_pet(self, pet_name):
         self.act_cards.clear()
 
         group_width = self.speedGroup.width()
         self.speedGroup.hide()
         self.speedGroup = SettingCardGroup(
-            self.tr("动作速度设置"), self.scrollWidget
+            self.tr("Action Speed Settings"), self.scrollWidget
         )
         if group_width > 0:
             self.speedGroup.resize(group_width, self.speedGroup.height())
@@ -225,7 +270,7 @@ class ActSpeedInterface(ScrollArea):
                 continue
 
             has_move = conf.get("need_move", False)
-            display_name = _ACTION_LABELS.get(act_name, act_name)
+            display_name = self._get_action_label(act_name)
 
             # Determine base values:
             # If we have saved base values use them (preserves originals),
@@ -247,6 +292,23 @@ class ActSpeedInterface(ScrollArea):
             self.speedGroup.addSettingCard(card)
             self.act_cards[act_name] = card
 
+    def refresh_language(self):
+        if settings.language_code.startswith("zh"):
+            self.titleLabel.setText("动作速度")
+            self.petSelector.setTitle("选择角色")
+            self.petSelector.setContent("选择要调整动作速度的角色")
+            self.saveBtn.setText("保存")
+            self.speedGroup.titleLabel.setText("动作速度设置")
+        else:
+            self.titleLabel.setText("Action Speed")
+            self.petSelector.setTitle("Choose character")
+            self.petSelector.setContent("Choose the character whose action speed you want to adjust")
+            self.saveBtn.setText("Save")
+            self.speedGroup.titleLabel.setText("Action Speed Settings")
+
+        for card in self.act_cards.values():
+            card.refresh_language()
+
     def _on_save(self):
         pet_name = self.petSelector.comboBox.currentText()
         if not pet_name:
@@ -265,28 +327,20 @@ class ActSpeedInterface(ScrollArea):
             speed = values["speed"]
             move = values.get("move", 1.0)
 
-            # Store multipliers + base values for future reload
             entry = {"speed": speed, "base_refresh": card.base_refresh}
             if card.has_move:
                 entry["move"] = move
                 entry["base_move"] = card.base_move
             pet_speeds[act_name] = entry
 
-            # Apply to act_conf.json
             if act_name in act_conf:
-                act_conf[act_name]["frame_refresh"] = (
-                    card.base_refresh / speed
-                )
+                act_conf[act_name]["frame_refresh"] = card.base_refresh / speed
                 if card.has_move:
-                    act_conf[act_name]["frame_move"] = (
-                        card.base_move * move
-                    )
+                    act_conf[act_name]["frame_move"] = card.base_move * move
 
-        # Write back act_conf.json
         with open(act_path, "w", encoding="utf-8") as f:
             json.dump(act_conf, f, indent=4, ensure_ascii=False)
 
-        # Save multipliers + base values to settings
         if pet_speeds:
             settings.act_speed[pet_name] = pet_speeds
         else:
@@ -295,7 +349,7 @@ class ActSpeedInterface(ScrollArea):
 
         InfoBar.warning(
             "",
-            self.tr("设置已保存，重启程序后生效"),
+            self.tr("Settings saved. Restart the app to apply them."),
             duration=3000,
             position=InfoBarPosition.BOTTOM,
             parent=self.window(),

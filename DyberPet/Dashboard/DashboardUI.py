@@ -70,6 +70,23 @@ class DashboardMainWindow(FluentWindow):
 
         self.navigationInterface.setExpandWidth(150)
 
+    def refresh_language(self):
+        self.setWindowTitle(self.tr('Dashboard'))
+        self.navigationInterface.widget(self.statusInterface.objectName()).setText(self.tr('Status'))
+        self.navigationInterface.widget(self.backpackInterface.objectName()).setText(self.tr('Backpack'))
+        self.navigationInterface.widget(self.shopInterface.objectName()).setText(self.tr('Shop'))
+        self.navigationInterface.widget(self.taskInterface.objectName()).setText(self.tr('Daily Tasks'))
+        self.navigationInterface.widget(self.animInterface.objectName()).setText(self.tr('Animation'))
+        for interface in [
+            self.statusInterface,
+            self.backpackInterface,
+            self.shopInterface,
+            self.taskInterface,
+            self.animInterface,
+        ]:
+            if hasattr(interface, "refresh_language"):
+                interface.refresh_language()
+
     def initWindow(self):
         #self.setMinimumSize(minWidth, minHeight)
         #self.resize(1000, 800)

@@ -127,6 +127,10 @@ From top to bottom, there are 3 widgets:
         self.__showMessageBox(title, content)
         return     
 
+    def refresh_language(self):
+        self.panelLabel.setText(self.tr("Daily Tasks"))
+        self._showInstruction()
+
     def __showMessageBox(self, title, content, yesText='OK'):
 
         WarrningMessage = MessageBox(title, content, self)

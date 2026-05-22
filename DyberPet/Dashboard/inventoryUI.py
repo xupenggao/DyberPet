@@ -267,6 +267,14 @@ If there is any item in the first cell of the consumable item tab, this item wil
         # disable the confirm button
         self._buttonUpdate(0, 0)
 
+    def refresh_language(self):
+        self.panelLabel.setText(self.tr("Backpack"))
+        self.confirmButton.setText(self.tr("Use"))
+        self.coinWidget._updateCoinUI()
+        self.foodInterface.refresh_language()
+        self.clctInterface.refresh_language()
+        self.petsInterface.refresh_language()
+
     def _confirmClicked(self):
         index = self.stackedWidget.currentIndex()
         self.confirmClicked.emit(index)

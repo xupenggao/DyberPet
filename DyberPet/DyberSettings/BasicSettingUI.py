@@ -1,4 +1,4 @@
-# coding:utf-8
+﻿# coding:utf-8
 import os
 import json
 import urllib.request
@@ -479,10 +479,134 @@ class SettingInterface(ScrollArea):
     def _LanguageChanged(self, value):
         settings.language_code = settings.lang_dict[value]
         settings.save_settings()
-        settings.change_translator(settings.lang_dict[value])
-        #self.retranslateUi()
         self.__showRestartTooltip()
-        self.lang_changed.emit()
+
+    def refresh_contact_author(self):
+        if settings.language_code.startswith('zh'):
+            self.contactAuthorBtn.setText("联系作者")
+        else:
+            self.contactAuthorBtn.setText("Contact Author")
+
+    def refresh_language(self):
+        is_en = settings.language_code == 'en_US'
+        if is_en:
+            self.settingLabel.setText("Settings")
+            self.refresh_contact_author()
+            self.ModeGroup.titleLabel.setText("Mode")
+            self.AlwaysOnTopCard.setTitle("Always-On-Top")
+            self.AlwaysOnTopCard.setContent("Pet will be displayed on top of the other Apps")
+            self.AllowDropCard.setTitle("Allow Drop")
+            self.AllowDropCard.setContent("When mouse released, pet falls to the ground (on) / stays at the site (off)")
+            self.WalkOnWindowCard.setTitle("Walk on Window")
+            self.WalkOnWindowCard.setContent("Pet will occasionally walk to the foreground window, then return to the original place")
+            self.WalkOnlyCard.setTitle("Walk Only")
+            self.WalkOnlyCard.setContent("When enabled, only walk actions will play while pet is on the foreground window")
+            self.AutoLockCard.setTitle("Auto-Lock")
+            self.AutoLockCard.setContent("When screen is locked, HP and FV will be locked too (currently only works in Windows)")
+            self.AutoStartCard.setTitle("Auto-Start")
+            self.AutoStartCard.setContent("Run DyberPet automatically when the system starts (currently only works in Windows)")
+            self.InteractionGroup.titleLabel.setText("Interaction")
+            self.GravityCard.setTitle("Gravity")
+            self.GravityCard.setContent("Pet falling down acceleration")
+            self.DragCard.setTitle("Drag Speed")
+            self.DragCard.setContent("Mouse speed factor")
+            self.VolumnGroup.titleLabel.setText("Notification")
+            self.VolumnCard.setTitle("Volumn")
+            self.VolumnCard.setContent("Volumn of notification and pet")
+            self.AllowToasterCard.setTitle("Pop-up Toaster")
+            self.AllowToasterCard.setContent("When turned on, notification will pop-up at the bottom right corner")
+            self.AllowBubbleCard.setTitle("Dialogue Bubble")
+            self.AllowBubbleCard.setContent("When turned on, various kinds of bubbles will pop-up above the pet")
+            self.CompanionGroup.titleLabel.setText("离线陪伴")
+            self.CompanionEnabledCard.setTitle("Offline Companion Enabled")
+            self.CompanionEnabledCard.setContent("Use local-rule-driven companion bubbles, no online AI required")
+            self.CompanionProactiveCard.setTitle("Proactive Companion Bubble")
+            self.CompanionProactiveCard.setContent("Allow the pet to occasionally send a gentle companion bubble on its own")
+            self.CompanionContextualCard.setTitle("Work Scenario Companion")
+            self.CompanionContextualCard.setContent("Show low-frequency companion bubbles while working in IDEs, design, or office apps")
+            self.CompanionNightCard.setTitle("Late Night Companion Reminder")
+            self.CompanionNightCard.setContent("Allow softer and lower-frequency companion bubbles late at night")
+            self.companionFrequencyCard.setTitle("Interaction Frequency")
+            self.companionFrequencyCard.setContent("Choose the interaction frequency for offline companion bubbles")
+            self.PersonalGroup.titleLabel.setText("Personalization")
+            self.ScaleCard.setTitle("Pet Scale")
+            self.ScaleCard.setContent("Adjust size of the pet")
+            self.DefaultPetCard.setTitle("Default Pet")
+            self.DefaultPetCard.setContent("Pet to show everytime App starts")
+            self.languageCard.setTitle("Language")
+            self.languageCard.setContent("Set your preferred language for UI")
+            self.themeColorCard.card.setTitle("Theme color")
+            self.themeColorCard.card.setContent("Change the theme color of your application")
+            self.themeColorCard.defaultRadioButton.setText("Default color")
+            self.themeColorCard.customRadioButton.setText("Custom color")
+            self.themeColorCard.customLabel.setText("Custom color")
+            self.themeColorCard.chooseColorButton.setText("Choose color")
+            checked_button = self.themeColorCard.buttonGroup.checkedButton()
+            if checked_button:
+                self.themeColorCard.choiceLabel.setText(checked_button.text())
+            self.themeColorCard.choiceLabel.adjustSize()
+            self.UpdateGroup.titleLabel.setText("Update")
+            self.checkUpdateBtn.setText("Check Updates")
+            self.versionLabel.setText("Current version: " + settings.VERSION)
+        else:
+            self.settingLabel.setText("基本设置")
+            self.refresh_contact_author()
+            self.ModeGroup.titleLabel.setText("模式")
+            self.AlwaysOnTopCard.setTitle("窗口置顶")
+            self.AlwaysOnTopCard.setContent("开启后桌宠将始终显示在其他应用窗口之上")
+            self.AllowDropCard.setTitle("允许掉落")
+            self.AllowDropCard.setContent("鼠标释放后，桌宠掉落到地面（开）或停留在原位（关）")
+            self.WalkOnWindowCard.setTitle("前台窗口巡游")
+            self.WalkOnWindowCard.setContent("桌宠偶尔会走到当前前台窗口上方活动，然后返回原位")
+            self.WalkOnlyCard.setTitle("仅步行")
+            self.WalkOnlyCard.setContent("开启后桌宠在前台窗口上方时只进行步行动作，不穿插随机动作")
+            self.AutoLockCard.setTitle("自动锁定")
+            self.AutoLockCard.setContent("锁屏时暂停饱食度和好感度变化（仅支持 Windows）")
+            self.AutoStartCard.setTitle("开机自启")
+            self.AutoStartCard.setContent("系统启动时自动运行 DyberPet（仅支持 Windows）")
+            self.InteractionGroup.titleLabel.setText("交互")
+            self.GravityCard.setTitle("重力")
+            self.GravityCard.setContent("桌宠掉落的加速度")
+            self.DragCard.setTitle("拖拽速度")
+            self.DragCard.setContent("鼠标拖拽桌宠的速度系数")
+            self.VolumnGroup.titleLabel.setText("通知")
+            self.VolumnCard.setTitle("音量")
+            self.VolumnCard.setContent("通知和桌宠的音量大小")
+            self.AllowToasterCard.setTitle("弹窗通知")
+            self.AllowToasterCard.setContent("开启后通知将以弹窗形式显示在屏幕右下角")
+            self.AllowBubbleCard.setTitle("对话气泡")
+            self.AllowBubbleCard.setContent("开启后桌宠头顶会弹出各种类型的气泡对话")
+            self.CompanionGroup.titleLabel.setText("Offline Companion")
+            self.CompanionEnabledCard.setTitle("离线陪伴互动")
+            self.CompanionEnabledCard.setContent("使用本地规则驱动的陪伴气泡，无需联网 AI")
+            self.CompanionProactiveCard.setTitle("主动陪伴气泡")
+            self.CompanionProactiveCard.setContent("允许桌宠偶尔主动冒出一条温柔的陪伴气泡")
+            self.CompanionContextualCard.setTitle("工作场景陪伴")
+            self.CompanionContextualCard.setContent("在 IDE、设计或办公软件中工作时显示低频陪伴气泡")
+            self.CompanionNightCard.setTitle("深夜陪伴提醒")
+            self.CompanionNightCard.setContent("深夜时段允许更柔和、更低频的陪伴气泡")
+            self.companionFrequencyCard.setTitle("互动频率")
+            self.companionFrequencyCard.setContent("选择离线陪伴气泡的互动频率")
+            self.PersonalGroup.titleLabel.setText("个性化")
+            self.ScaleCard.setTitle("桌宠大小")
+            self.ScaleCard.setContent("调整桌宠的显示大小")
+            self.DefaultPetCard.setTitle("默认桌宠")
+            self.DefaultPetCard.setContent("每次启动应用时显示的桌宠角色")
+            self.languageCard.setTitle("Language/语言")
+            self.languageCard.setContent("设置界面显示语言")
+            self.themeColorCard.card.setTitle("主题色")
+            self.themeColorCard.card.setContent("更改应用的主题配色")
+            self.themeColorCard.defaultRadioButton.setText("默认颜色")
+            self.themeColorCard.customRadioButton.setText("自定义颜色")
+            self.themeColorCard.customLabel.setText("自定义颜色")
+            self.themeColorCard.chooseColorButton.setText("选择颜色")
+            checked_button = self.themeColorCard.buttonGroup.checkedButton()
+            if checked_button:
+                self.themeColorCard.choiceLabel.setText(checked_button.text())
+            self.themeColorCard.choiceLabel.adjustSize()
+            self.UpdateGroup.titleLabel.setText("更新")
+            self.checkUpdateBtn.setText("检查更新")
+            self.versionLabel.setText("当前版本：" + settings.VERSION)
     
     def __showRestartTooltip(self):
         """ show restart tooltip """
@@ -649,7 +773,16 @@ class SettingInterface(ScrollArea):
 
         layout = QVBoxLayout(dialog)
 
-        titleLabel = QLabel(self.tr("微信二维码"))
+        if settings.language_code.startswith('zh'):
+            title_text = "微信二维码"
+            hint_text = "扫码添加微信"
+            error_text = "二维码图片未找到"
+        else:
+            title_text = "WeChat QR Code"
+            hint_text = "Scan to add WeChat"
+            error_text = "QR code image not found"
+
+        titleLabel = QLabel(title_text)
         titleLabel.setAlignment(Qt.AlignCenter)
         setFont(titleLabel, 16, QFont.DemiBold)
         layout.addWidget(titleLabel)
@@ -663,11 +796,11 @@ class SettingInterface(ScrollArea):
             imgLabel.setAlignment(Qt.AlignCenter)
             layout.addWidget(imgLabel, 0, Qt.AlignCenter)
 
-            hintLabel = QLabel(self.tr("扫码添加微信"))
+            hintLabel = QLabel(hint_text)
             hintLabel.setAlignment(Qt.AlignCenter)
             layout.addWidget(hintLabel)
         else:
-            errorLabel = QLabel(self.tr("二维码图片未找到"))
+            errorLabel = QLabel(error_text)
             errorLabel.setAlignment(Qt.AlignCenter)
             layout.addWidget(errorLabel)
 

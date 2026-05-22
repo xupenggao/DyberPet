@@ -7,6 +7,7 @@ import os.path
 from datetime import datetime, timedelta
 from sys import platform
 from DyberPet.utils import text_wrap, get_child_folder
+import DyberPet.settings as settings
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
@@ -1348,7 +1349,7 @@ class ItemData:
         :param buff 增益相关
         :param description 物品描述
         """
-        name = itemName #conf_param['name']
+        name = settings.get_localized_text(conf_param.get('name', itemName), default=itemName)
         image = _load_item_img(os.path.join(itemFolder, conf_param['image']))
         effect_HP = int(conf_param.get('effect_HP', 0))
         
@@ -1365,7 +1366,7 @@ class ItemData:
 
         drop_rate = float(conf_param.get('drop_rate', 0))
         fv_lock = int(conf_param.get('fv_lock', 1))
-        description = text_wrap(conf_param.get('description', ''), 15) #self.wrapper(conf_param.get('description', ''))
+        description = text_wrap(settings.get_localized_text(conf_param.get('description', ''), default=''), 15)
         item_type = conf_param.get('type', 'consumable')
         if item_type == 'coin':
             coin_name_dict = conf_param.get('name', {})
@@ -1373,6 +1374,10 @@ class ItemData:
             self.coin = {'name':coin_name_dict, 'image':image}
 
         buff = conf_param.get('buff', {})
+        buff_description = settings.get_localized_text(buff.get('description', ''), default='')
+        if isinstance(buff, dict) and buff_description:
+            buff = dict(buff)
+            buff['description'] = buff_description
 
         if effect_FV==0 and effect_HP==0:
             hint = '{} {}\n\n{}\n'.format(name,
@@ -1381,7 +1386,6 @@ class ItemData:
         else:
             hint = f"{name} {' '.join(['⭐']*fv_lock)}\n\n{description}\n____________________________________\n\n{self.HUNGERSTR}: {effect_HP_str}\n{self.FAVORSTR}: {effect_FV_str}\n"
         
-        buff_description = buff.get('description', '')
         if buff_description:
             hint += f'\n{text_wrap(buff_description, 15)}'
             
@@ -1456,7 +1460,7 @@ def init_item(conf_param, itemName, itemFolder, modName, HUNGERSTR, FAVORSTR):
     :param description 物品描述
     """
 
-    name = itemName #conf_param['name']
+    name = settings.get_localized_text(conf_param.get('name', itemName), default=itemName)
     image = _load_item_img(os.path.join(itemFolder, conf_param['image']))
     effect_HP = int(conf_param.get('effect_HP', 0))
     
@@ -1473,10 +1477,14 @@ def init_item(conf_param, itemName, itemFolder, modName, HUNGERSTR, FAVORSTR):
 
     drop_rate = float(conf_param.get('drop_rate', 0))
     fv_lock = int(conf_param.get('fv_lock', 1))
-    description = text_wrap(conf_param.get('description', ''), 15)
+    description = text_wrap(settings.get_localized_text(conf_param.get('description', ''), default=''), 15)
     item_type = conf_param.get('type', 'consumable')
 
     buff = conf_param.get('buff', {})
+    buff_description = settings.get_localized_text(buff.get('description', ''), default='') if isinstance(buff, dict) else ''
+    if isinstance(buff, dict) and buff_description:
+        buff = dict(buff)
+        buff['description'] = buff_description
 
     if effect_FV==0 and effect_HP==0:
         hint = '{} {}\n\n{}\n'.format(name,
@@ -1485,7 +1493,6 @@ def init_item(conf_param, itemName, itemFolder, modName, HUNGERSTR, FAVORSTR):
     else:
         hint = f"{name} {' '.join(['⭐']*fv_lock)}\n\n{description}\n____________________________________\n\n{HUNGERSTR}: {effect_HP_str}\n{FAVORSTR}: {effect_FV_str}\n"
     
-    buff_description = buff.get('description', '')
     if buff_description:
         hint += f'\n{text_wrap(buff_description, 15)}'
     '''

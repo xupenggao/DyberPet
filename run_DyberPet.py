@@ -91,6 +91,7 @@ class DyberPetApp(QApplication):
 
         # Signal Links
         self.__connectSignalToSlot()
+        self.refresh_language()
 
         # Startup update check (silent, background)
         self._startup_update_check()
@@ -117,6 +118,7 @@ class DyberPetApp(QApplication):
         self.conp.settingInterface.ontop_changed.connect(self.p.ontop_update)
         self.conp.settingInterface.scale_changed.connect(self.p.reset_size)
         self.conp.settingInterface.lang_changed.connect(self.p.lang_changed)
+        self.conp.settingInterface.lang_changed.connect(self.refresh_language)
         self.conp.settingInterface.walk_on_window_changed.connect(self.p.walk_on_window_changed)
         self.p.change_note.connect(self.conp.settingInterface._update_scale)
 
@@ -213,6 +215,15 @@ class DyberPetApp(QApplication):
         self._update_check_thread = _StartupUpdateThread()
         self._update_check_thread.update_found.connect(self._on_startup_update_found)
         self._update_check_thread.start()
+
+    def refresh_language(self):
+        if hasattr(self.conp, "refresh_language"):
+            self.conp.refresh_language()
+        if hasattr(self.board, "refresh_language"):
+            self.board.refresh_language()
+        self.p._set_menu(settings.pets)
+        self.p._set_Statusmenu()
+        self.note.change_pet()
 
     def _on_startup_update_found(self, version):
         InfoBar.info(

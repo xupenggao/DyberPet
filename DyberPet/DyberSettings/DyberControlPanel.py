@@ -66,6 +66,25 @@ class ControlMainWindow(FluentWindow):
 
         self.navigationInterface.setExpandWidth(200)
 
+    def refresh_language(self):
+        self.setWindowTitle(self.tr('System'))
+        self.navigationInterface.widget(self.settingInterface.objectName()).setText(self.tr('Settings'))
+        self.navigationInterface.widget(self.gamesaveInterface.objectName()).setText(self.tr('Game Save'))
+        self.navigationInterface.widget(self.charCardInterface.objectName()).setText(self.tr('Characters'))
+        self.navigationInterface.widget(self.itemCardInterface.objectName()).setText(self.tr('Item MOD'))
+        self.navigationInterface.widget(self.petCardInterface.objectName()).setText(self.tr('Mini-Pets'))
+        self.navigationInterface.widget(self.actSpeedInterface.objectName()).setText(self.tr('动作速度'))
+        for interface in [
+            self.settingInterface,
+            self.gamesaveInterface,
+            self.charCardInterface,
+            self.itemCardInterface,
+            self.petCardInterface,
+            self.actSpeedInterface,
+        ]:
+            if hasattr(interface, "refresh_language"):
+                interface.refresh_language()
+
     def initWindow(self):
         #self.setMinimumSize(minWidth, minHeight)
         #self.resize(1000, 800)

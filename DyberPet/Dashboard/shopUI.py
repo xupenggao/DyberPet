@@ -247,6 +247,14 @@ Please position your cursor over the item image to see details.""")
         self.coinWidget._updateCoinUI()
         self.ShopView._updateAllItemUI()
 
+    def refresh_language(self):
+        self.panelLabel.setText(self.tr("Shop"))
+        self.filterButton.setText(self.tr("Filter"))
+        self.coinWidget._updateCoinUI()
+        self.searchLineEdit.setPlaceholderText(self.tr('Search by name, MOD...'))
+        self.ShopView.refresh_language()
+        self.filterView.refresh_language()
+
     def fvchange(self, fv_lvl):
         self.ShopView._fvchange(fv_lvl)
 
