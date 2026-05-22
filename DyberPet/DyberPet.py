@@ -1,4 +1,6 @@
 import sys
+import os
+import subprocess
 from sys import platform
 import time
 import math
@@ -1078,6 +1080,7 @@ class PetWidget(QWidget):
         self.StatMenu.addSeparator()
         
         self.StatMenu.addActions([
+            Action(FIF.SYNC, self.tr('Restart'), triggered=self._restart),
             Action(FIF.POWER_BUTTON, self.tr('Exit'), triggered=self.quit),
         ])
 
@@ -2121,6 +2124,20 @@ class PetWidget(QWidget):
         self.setup_acc.emit(accs, x, y)
 
 
+
+    def _restart(self) -> None:
+        settings.save_settings()
+        settings.pet_data.save_data()
+        settings.pet_data.frozen()
+        self._stop_active_window_timers()
+        self.stop_thread('Animation')
+        self.stop_thread('Interaction')
+        self.stop_thread("Scheduler")
+        self.stopAllThread.emit()
+
+        subprocess.Popen([sys.executable] + sys.argv)
+        self.close()
+        sys.exit()
 
     def quit(self) -> None:
         """

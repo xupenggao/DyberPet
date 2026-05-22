@@ -703,6 +703,11 @@ For most of time, App can import the MOD for you automatically. But in any case 
         <translation>角色面板</translation>
     </message>
     <message>
+        <location filename="../../DyberPet/DyberPet.py" line="1083"/>
+        <source>Restart</source>
+        <translation>重启</translation>
+    </message>
+    <message>
         <location filename="../../DyberPet/DyberPet.py" line="1158"/>
         <source>Exit</source>
         <translation>退出</translation>
