@@ -142,7 +142,13 @@ class Dyber_RangeSettingCard(SettingCard):
         self.valueLabel.setObjectName('valueLabel')
         #configItem.valueChanged.connect(self.setValue)
         self.slider.valueChanged.connect(self.__onValueChanged)
+        self.slider.installEventFilter(self)
     
+    def eventFilter(self, obj, event):
+        if obj is self.slider and event.type() == event.Type.Wheel:
+            return True
+        return super().eventFilter(obj, event)
+
     def __onValueChanged(self, value: int):
         """ slider value changed slot """
         self.setValue(value)

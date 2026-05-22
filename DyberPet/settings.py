@@ -126,7 +126,7 @@ def init():
     dragspeedx,dragspeedy=0,0
     fixdragspeedx, fixdragspeedy = 1.0, 1.0
     fall_right = False
-    gravity = 0.4
+    gravity = 0.62
     prefall = 0
 
     global act_id, current_act, previous_act
@@ -334,9 +334,9 @@ def init_settings():
         companion_proactive = data_params.get('companion_proactive', True)
         companion_contextual = data_params.get('companion_contextual', True)
         companion_night = data_params.get('companion_night', True)
-        companion_frequency = data_params.get('companion_frequency', 'low')
+        companion_frequency = data_params.get('companion_frequency', 'high')
         if companion_frequency not in ['low', 'medium', 'high']:
-            companion_frequency = 'low'
+            companion_frequency = 'high'
 
         # AI Pet Creator API config
         global ai_api_key, ai_api_base
@@ -354,7 +354,7 @@ def init_settings():
 
     else:
         fixdragspeedx, fixdragspeedy = 1.0, 1.0
-        gravity = 0.4
+        gravity = 0.62
         volume = 0.5
         language_code = QtCore.QLocale().name()
         on_top_hint = True
@@ -378,7 +378,7 @@ def init_settings():
         companion_proactive = True
         companion_contextual = True
         companion_night = True
-        companion_frequency = 'low'
+        companion_frequency = 'high'
         ai_api_key = ''
         ai_api_base = 'https://ark.cn-beijing.volces.com/api/v3'
         act_speed = {}
