@@ -875,9 +875,8 @@ class SubPet(QWidget):
 
         # 鼠标拖拽初始属性
         self.is_follow_mouse = False
+        self.mouse_moving = False
         self.mouse_drag_pos = self.pos()
-
-        # Some geo info
         self.screen_geo = settings.current_screen.availableGeometry()
         self.current_screen = settings.current_screen.availableGeometry() #geometry()
         self.screen_width = self.current_screen.width()
@@ -999,6 +998,7 @@ class SubPet(QWidget):
             #print('activated')
             # 左键绑定拖拽
             self.is_follow_mouse = True
+            self.mouse_moving = False
             self.mouse_drag_pos = event.globalPos() - self.pos()
             
             if self.onfloor == 0:
@@ -1022,6 +1022,7 @@ class SubPet(QWidget):
         if self.follow_main_y:
             return
         if Qt.LeftButton and self.is_follow_mouse:
+            self.mouse_moving = True
             self.move(event.globalPos() - self.mouse_drag_pos)
             
             if self.mouseposx3 == 0:
@@ -1069,8 +1070,9 @@ class SubPet(QWidget):
             self.is_follow_mouse = False
             self.setCursor(QCursor(Qt.ArrowCursor))
 
-            if self.onfloor == 1:
+            if self.onfloor == 1 and not self.mouse_moving:
                 self.patpat()
+                self.mouse_moving = False
 
             else:
 
@@ -1110,6 +1112,7 @@ class SubPet(QWidget):
                     self.current_img = self.pet_conf.default.images[0]
                     self.set_img()
                     self.start_interact(None)
+                self.mouse_moving = False
 
     def update_anchor(self):
         if not self.closing and self.follow_main_x and not self.follow_main_y:

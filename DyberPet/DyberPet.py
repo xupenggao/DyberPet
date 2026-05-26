@@ -1,6 +1,5 @@
 import sys
 import os
-import subprocess
 from sys import platform
 import time
 import math
@@ -2130,14 +2129,19 @@ class PetWidget(QWidget):
         settings.pet_data.save_data()
         settings.pet_data.frozen()
         self._stop_active_window_timers()
-        self.stop_thread('Animation')
-        self.stop_thread('Interaction')
-        self.stop_thread("Scheduler")
+        for name in ('Animation', 'Interaction', 'Scheduler'):
+            try:
+                self.stop_thread(name)
+            except Exception:
+                pass
         self.stopAllThread.emit()
 
+        import tempfile, subprocess
+        marker = os.path.join(tempfile.gettempdir(), 'dyberpet_restart')
+        with open(marker, 'w') as f:
+            pass
         subprocess.Popen([sys.executable] + sys.argv)
-        self.close()
-        sys.exit()
+        os._exit(0)
 
     def quit(self) -> None:
         """
@@ -2148,9 +2152,11 @@ class PetWidget(QWidget):
         settings.pet_data.save_data()
         settings.pet_data.frozen()
         self._stop_active_window_timers()
-        self.stop_thread('Animation')
-        self.stop_thread('Interaction')
-        self.stop_thread("Scheduler")
+        for name in ('Animation', 'Interaction', 'Scheduler'):
+            try:
+                self.stop_thread(name)
+            except Exception:
+                pass
         self.stopAllThread.emit()
         self.close()
         sys.exit()

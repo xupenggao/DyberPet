@@ -2,6 +2,7 @@
 from sys import platform
 import ctypes
 import os
+import tempfile
 
 # Compute basedir in main module (where Nuitka sets __compiled__)
 # and share with all submodules via sys._dyberpet_basedir
@@ -244,11 +245,17 @@ class _StartupUpdateThread(QThread):
 
 if __name__ == '__main__':
 
-    # Avoid multiple process
-    try:
-        me = singleton.SingleInstance()
-    except:
-        sys.exit()
+    # On restart, skip SingleInstance lock (old process writes marker before exiting)
+    _restart_marker = os.path.join(tempfile.gettempdir(), 'dyberpet_restart')
+    _is_restarting = os.path.exists(_restart_marker)
+    if _is_restarting:
+        os.remove(_restart_marker)
+
+    if not _is_restarting:
+        try:
+            me = singleton.SingleInstance()
+        except:
+            sys.exit()
 
 
     # Create App
