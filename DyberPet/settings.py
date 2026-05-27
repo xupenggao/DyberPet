@@ -112,6 +112,9 @@ def init():
     current_anchor = [0,0]
     previous_anchor = [0,0]
 
+    global pet_widget_height
+    pet_widget_height = 200
+
     global onfloor, draging, set_fall, playid
     global mouseposx1,mouseposx2,mouseposx3,mouseposx4,mouseposx5
     global mouseposy1,mouseposy2,mouseposy3,mouseposy4,mouseposy5

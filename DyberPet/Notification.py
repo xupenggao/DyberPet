@@ -694,7 +694,7 @@ class BubbleText(QFrame):
         self.leftover = int(timeout/1000)
         self.countdown = countdown
         self.pos_x = pos_x
-        self.pos_y = int(pos_y-settings.current_img.height()*settings.tunable_scale)
+        self.pos_y = int(pos_y-settings.pet_widget_height)
         
         # Duration and Animation
         self.timer = QTimer(singleShot=True, timeout=self.hide)
@@ -854,7 +854,7 @@ class BubbleText(QFrame):
 
     def move_to_main(self, pos_x, pos_y):
         self.pos_x = pos_x
-        self.pos_y = pos_y-settings.current_img.height()*settings.tunable_scale
+        self.pos_y = pos_y-settings.pet_widget_height
         self.move(self.pos_x-self.width()//2, self.pos_y-self.height()-self.height_margin)
 
     def update_countdown(self):

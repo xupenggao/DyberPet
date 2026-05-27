@@ -1692,6 +1692,7 @@ class PetWidget(QWidget):
         self.setFixedSize( int(max(self.tomato_time.width()+statbar_h,self.pet_conf.width*settings.tunable_scale)),
                            int(2*statbar_h+self.pet_conf.height*settings.tunable_scale)
                          )
+        settings.pet_widget_height = self.height()
 
         #self.label.setFixedWidth(self.width())
 

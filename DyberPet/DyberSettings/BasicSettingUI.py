@@ -769,7 +769,7 @@ class SettingInterface(ScrollArea):
     def __onContactAuthor(self):
         dialog = QDialog(self)
         dialog.setWindowTitle(self.tr("联系作者"))
-        dialog.setFixedSize(350, 400)
+        dialog.setFixedSize(350, 450)
 
         layout = QVBoxLayout(dialog)
 
@@ -777,10 +777,12 @@ class SettingInterface(ScrollArea):
             title_text = "微信二维码"
             hint_text = "扫码添加微信"
             error_text = "二维码图片未找到"
+            email_text = "邮箱：pgxu960225@gmail.com"
         else:
             title_text = "WeChat QR Code"
             hint_text = "Scan to add WeChat"
             error_text = "QR code image not found"
+            email_text = "Email: pgxu960225@gmail.com"
 
         titleLabel = QLabel(title_text)
         titleLabel.setAlignment(Qt.AlignCenter)
@@ -803,6 +805,11 @@ class SettingInterface(ScrollArea):
             errorLabel = QLabel(error_text)
             errorLabel.setAlignment(Qt.AlignCenter)
             layout.addWidget(errorLabel)
+
+        emailLabel = QLabel(email_text)
+        emailLabel.setAlignment(Qt.AlignCenter)
+        setFont(emailLabel, 12, QFont.Normal)
+        layout.addWidget(emailLabel)
 
         dialog.exec()
 
