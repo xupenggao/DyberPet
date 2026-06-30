@@ -674,14 +674,14 @@ class PetWidget(QWidget):
             if platform == 'win32':
                 self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.SubWindow | Qt.NoDropShadowWindowHint)
             else:
-                # macOS: Qt.Tool keeps the pet window from stealing keyboard focus
-                self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.NoDropShadowWindowHint)
+                # SubWindow not work in MacOS
+                self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.NoDropShadowWindowHint)
         else:
             if platform == 'win32':
                 self.setWindowFlags(Qt.FramelessWindowHint | Qt.SubWindow | Qt.NoDropShadowWindowHint)
             else:
-                # macOS: Qt.Tool keeps the pet window from stealing keyboard focus
-                self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.NoDropShadowWindowHint)
+                # SubWindow not work in MacOS
+                self.setWindowFlags(Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
 
         self.setAutoFillBackground(False)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
@@ -695,14 +695,14 @@ class PetWidget(QWidget):
             if platform == 'win32':
                 self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.SubWindow | Qt.NoDropShadowWindowHint)
             else:
-                # macOS: Qt.Tool keeps the pet window from stealing keyboard focus
-                self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.NoDropShadowWindowHint)
+                # SubWindow not work in MacOS
+                self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.NoDropShadowWindowHint)
         else:
             if platform == 'win32':
                 self.setWindowFlags(Qt.FramelessWindowHint | Qt.SubWindow | Qt.NoDropShadowWindowHint)
             else:
-                # macOS: Qt.Tool keeps the pet window from stealing keyboard focus
-                self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.NoDropShadowWindowHint)
+                # SubWindow not work in MacOS
+                self.setWindowFlags(Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
                 
         self.setAutoFillBackground(False)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
