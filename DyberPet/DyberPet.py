@@ -709,7 +709,10 @@ class PetWidget(QWidget):
         self.show()
 
     def _ensure_topmost(self):
-        if settings.on_top_hint:
+        # On macOS raise_() forces the window to become key and steals keyboard
+        # focus from other apps (breaks typing every 5s). WindowStaysOnTopHint
+        # already keeps the pet on top there, so skip the explicit raise on darwin.
+        if settings.on_top_hint and platform != 'darwin':
             self.raise_()
 
     def _init_ui(self):
