@@ -6,13 +6,15 @@ import tempfile
 
 # Compute basedir in main module (where Nuitka sets __compiled__)
 # and share with all submodules via sys._dyberpet_basedir
-if "__compiled__" in globals():
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    sys._dyberpet_basedir = sys._MEIPASS
+elif "__compiled__" in globals():
     sys._dyberpet_basedir = os.path.dirname(os.path.abspath(sys.argv[0]))
 elif platform == 'win32':
     sys._dyberpet_basedir = ''
 else:
     _bd = os.path.dirname(os.path.abspath(__file__))
-    sys._dyberpet_basedir = '/'.join(_bd.replace('\\','/').split('/')[:-1])
+    sys._dyberpet_basedir = _bd
 
 from tendo import singleton
 from DyberPet.utils import read_json
@@ -268,5 +270,4 @@ if __name__ == '__main__':
     app.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings)
 
     sys.exit(app.exec())
-
 
