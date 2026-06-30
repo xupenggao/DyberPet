@@ -22,6 +22,9 @@ BASEDIR = basedir
 if platform == 'linux':
     configdir = os.path.dirname(os.environ['HOME']+'/.config/DyberPet/DyberPet')
     CONFIGDIR = configdir
+elif platform == 'darwin':
+    configdir = os.path.join(os.path.expanduser('~/Library/Application Support'), 'DyberPet')
+    CONFIGDIR = configdir
 else:
     configdir = basedir
     CONFIGDIR = configdir
@@ -512,4 +515,3 @@ def check_dict_datatype(raw_dict:dict, dtype, default_value):
     dict: A new dictionary with corrected datatypes.
     """
     return {k: (v if isinstance(v, dtype) else default_value) for k, v in raw_dict.items()}
-

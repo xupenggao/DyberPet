@@ -26,6 +26,8 @@ if basedir is None:
 
 if platform == 'linux':
     configdir = os.path.dirname(os.environ['HOME']+'/.config/DyberPet/DyberPet')
+elif platform == 'darwin':
+    configdir = os.path.join(os.path.expanduser('~/Library/Application Support'), 'DyberPet')
 else:
     configdir = basedir
 
@@ -1575,7 +1577,6 @@ def _get_q_img(img_file) -> QPixmap:
     image = QPixmap()
     image.load(img_file)
     return image
-
 
 
 
