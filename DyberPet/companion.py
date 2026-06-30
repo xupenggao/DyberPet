@@ -12,6 +12,8 @@ class OfflineCompanion:
     RETURN_THRESHOLD = timedelta(minutes=30)
     IDLE_THRESHOLD = timedelta(minutes=45)
     QUIET_HOURS = ((23, 24), (0, 6))
+    MORNING_HOURS = ((6, 11),)
+    AFTERNOON_HOURS = ((13, 17),)
     DAILY_LIMITS = {
         "low": 6,
         "medium": 10,
@@ -30,6 +32,9 @@ class OfflineCompanion:
         "companion_working": 30 * 60,
         "companion_late_night": 60 * 60,
         "companion_idle_presence": 60 * 60,
+        "companion_morning": 60 * 60,
+        "companion_afternoon": 60 * 60,
+        "companion_walking": 180,
     }
     ICON_MAP = {
         "companion_greeting": "bb_companion_greeting",
@@ -40,6 +45,9 @@ class OfflineCompanion:
         "companion_working": "bb_companion_working",
         "companion_idle_presence": "bb_companion_idle_presence",
         "companion_return": "bb_companion_return",
+        "companion_morning": "bb_companion_morning",
+        "companion_afternoon": "bb_companion_afternoon",
+        "companion_walking": "bb_companion_walking",
     }
     APP_CATEGORY_PATTERNS = {
         "ide": ["code", "pycharm", "idea", "intellij", "visual studio", "devenv", "cursor", "windsurf"],
@@ -51,7 +59,7 @@ class OfflineCompanion:
 
     def __init__(self):
         self.config = self._load_config()
-        self.last_user_interaction_at = None
+        self.last_user_interaction_at = self._now()
         self.last_companion_bubble_at = None
         self.last_context_type = None
         self.last_context_times = {}
@@ -277,6 +285,16 @@ class OfflineCompanion:
             return None
         return self._build_bubble(context_type, now=now)
 
+    def handle_walking(self):
+        if not getattr(settings, "companion_enabled", True):
+            return None
+        now = self._now()
+        if settings.focus_timer_on:
+            return None
+        if not self._context_cooldown_ok("companion_walking", now):
+            return None
+        return self._build_bubble("companion_walking", now=now)
+
     def get_proactive_bubble(self, surface=None):
         now = self._now()
         if not getattr(settings, "companion_enabled", True):
@@ -299,6 +317,22 @@ class OfflineCompanion:
                     now=now,
                     quiet_hours_active=True,
                 )
+
+        hour = now.hour
+        if self._hour_in_ranges(hour, self.MORNING_HOURS) and self._context_cooldown_ok("companion_morning", now):
+            return self._build_bubble(
+                "companion_morning",
+                proactive=True,
+                now=now,
+                quiet_hours_active=quiet_hours_active,
+            )
+        if self._hour_in_ranges(hour, self.AFTERNOON_HOURS) and self._context_cooldown_ok("companion_afternoon", now):
+            return self._build_bubble(
+                "companion_afternoon",
+                proactive=True,
+                now=now,
+                quiet_hours_active=quiet_hours_active,
+            )
 
         if getattr(settings, "companion_contextual", True):
             app_category = self.classify_surface(surface)

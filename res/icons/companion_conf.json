@@ -403,5 +403,47 @@
       "There you are. I'm here.",
       "You're back."
     ]
+  },
+  "companion_morning": {
+    "zh_CN": [
+      "早安，慢慢唤醒自己。",
+      "新的一天，我都在。",
+      "早上的光线很温柔。"
+    ],
+    "en_US": [
+      "Good morning. Wake up slowly.",
+      "A new day. I'm here.",
+      "The morning light is gentle."
+    ]
+  },
+  "companion_afternoon": {
+    "zh_CN": [
+      "下午好，歇口气。",
+      "阳光照进来了。",
+      "如果困了，就眯一会儿。"
+    ],
+    "en_US": [
+      "Good afternoon. Take a breather.",
+      "The sunlight is coming in.",
+      "If you're sleepy, rest a little."
+    ]
+  },
+  "companion_walking": {
+    "zh_CN": [
+      "换个地方待着。",
+      "走两步，溜达一圈。",
+      "这边的视野也不错。",
+      "慢慢走到你旁边。",
+      "我在屏幕边上守着。",
+      "找个舒服的角落。"
+    ],
+    "en_US": [
+      "Somewhere else to stay.",
+      "Just walking around a bit.",
+      "The view here is nice too.",
+      "Slowly coming over to you.",
+      "I'll stay by the edge of the screen.",
+      "Looking for a cozy spot."
+    ]
   }
 }

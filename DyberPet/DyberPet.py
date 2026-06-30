@@ -451,6 +451,7 @@ class PetWidget(QWidget):
         self._excursion_interaction_paused = False
         self.last_task_reminder_at = None
         self.offline_companion = OfflineCompanion()
+        self.companion_walking_active = False
         self.companion_timer = QTimer(self)
         self.companion_timer.setInterval(60 * 1000)
         self.companion_timer.timeout.connect(self._poll_companion_bubble)
@@ -2446,6 +2447,16 @@ class PetWidget(QWidget):
 
         #print(act_list)
         #direction, frame_move = str(act_list[0]), float(act_list[1])
+        # 漫步陪伴气泡：仅在「静止→地面走动」的边沿尝试一次，叠加概率与冷却
+        is_moving = (plus_x != 0 or plus_y != 0)
+        if (is_moving and not self.companion_walking_active
+                and settings.onfloor == 1 and not settings.draging):
+            if random.uniform(0, 1) < 0.15:
+                companion_bubble = self.offline_companion.handle_walking()
+                if companion_bubble:
+                    self._emit_companion_bubble(companion_bubble)
+        self.companion_walking_active = is_moving
+
         pos = self.pos()
         new_x = pos.x() + plus_x
         new_y = pos.y() + plus_y
