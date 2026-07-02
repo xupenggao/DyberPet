@@ -134,18 +134,23 @@ class ActiveWindowTracker:
         '''
         try:
             result = subprocess.run(
-                ["osascript", "-e", script],
+                ["/usr/bin/osascript", "-e", script],
                 capture_output=True,
                 text=True,
-                timeout=1,
+                timeout=5,
                 check=False,
             )
             output = result.stdout.strip()
             if not output:
+                print("[ActiveWindow] macOS osascript empty output: "
+                      f"rc={result.returncode}, stderr={result.stderr.strip()[:200]}",
+                      flush=True)
                 return None
 
             parts = output.split("\t")
             if len(parts) != 6:
+                print(f"[ActiveWindow] macOS osascript unexpected parts={len(parts)}: "
+                      f"{output[:200]!r}", flush=True)
                 return None
 
             owner, title, left, top, width, height = parts
@@ -164,5 +169,10 @@ class ActiveWindowTracker:
                 handle=f"{owner}:{title}",
             )
             return surface if surface.usable() else None
-        except Exception:
+        except subprocess.TimeoutExpired:
+            print("[ActiveWindow] macOS osascript timed out (5s)", flush=True)
+            return None
+        except Exception as e:
+            print(f"[ActiveWindow] macOS surface error: {type(e).__name__}: {e}",
+                  flush=True)
             return None

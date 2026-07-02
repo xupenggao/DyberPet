@@ -1411,11 +1411,13 @@ class PetWidget(QWidget):
         if not settings.walk_on_active_window or self.active_window_excursion:
             return
         if settings.draging or settings.onfloor == 0 or self.is_follow_mouse:
+            print("[Excursion] postponed: draging/onfloor/follow_mouse", flush=True)
             self._schedule_active_window_excursion()
             return
 
         surface = self.active_window_tracker.get_surface()
         if surface is None:
+            print("[Excursion] no surface, retry later", flush=True)
             self._schedule_active_window_excursion()
             return
 
@@ -1437,10 +1439,15 @@ class PetWidget(QWidget):
 
         left_limit, right_limit, _, floor_pos = self._movement_limits()
         if right_limit < left_limit:
+            print(f"[Excursion] aborted: limits left={left_limit} right={right_limit} "
+                  f"(screen={self.screen_width}x{self.screen_height}, "
+                  f"pet={self.width()}x{self.height()})", flush=True)
             self._finish_active_window_excursion()
             return
         center_x = random.randint(int(left_limit), int(right_limit))
         self.move(center_x - self.width() // 2, floor_pos)
+        print(f"[Excursion] started ok: surface={surface.app_name} "
+              f"x={center_x} limits=[{left_limit},{right_limit}]", flush=True)
 
         if 'Interaction' in self.workers:
             self.workers['Interaction'].stop_interact()
