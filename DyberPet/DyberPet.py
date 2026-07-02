@@ -408,6 +408,7 @@ class PetWidget(QWidget):
 
         self.image = None
         self.tray = None
+        self._shutting_down = False
 
         # 鼠标拖拽初始属性
         self.is_follow_mouse = False
@@ -430,6 +431,7 @@ class PetWidget(QWidget):
         self.active_window_tracker = ActiveWindowTracker(os.getpid())
         self.active_window_surface = None
         self.active_window_miss_count = 0
+        self.active_window_permission_notified = False
         self.active_window_timer = QTimer(self)
         self.active_window_timer.setInterval(400)
         self.active_window_timer.timeout.connect(self._poll_active_window_surface)
@@ -685,6 +687,7 @@ class PetWidget(QWidget):
 
         self.setAutoFillBackground(False)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self._apply_macos_nonactivating_behavior()
         self.repaint()
         # 是否跟随鼠标
         self.is_follow_mouse = False
@@ -706,7 +709,14 @@ class PetWidget(QWidget):
                 
         self.setAutoFillBackground(False)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self._apply_macos_nonactivating_behavior()
         self.show()
+
+    def _apply_macos_nonactivating_behavior(self):
+        if platform != 'darwin':
+            return
+        self.setAttribute(Qt.WA_ShowWithoutActivating, True)
+        self.setWindowFlag(Qt.WindowDoesNotAcceptFocus, True)
 
     def _ensure_topmost(self):
         # On macOS raise_() forces the window to become key and steals keyboard
@@ -1399,24 +1409,31 @@ class PetWidget(QWidget):
         self.active_window_walk_timer.stop()
         self.active_window_timer.stop()
 
-    def _schedule_active_window_excursion(self, initial=False):
+    def _schedule_active_window_excursion(self, initial=False, retry_soon=False):
         if not settings.walk_on_active_window or platform not in ['win32', 'darwin']:
             return
         if self.active_window_excursion:
             return
-        delay = random.randint(8000, 18000) if initial else random.randint(35000, 90000)
+        delay = random.randint(3000, 5000) if initial or retry_soon else random.randint(35000, 90000)
         self.active_window_spawn_timer.start(delay)
 
     def _start_active_window_excursion(self):
         if not settings.walk_on_active_window or self.active_window_excursion:
             return
         if settings.draging or settings.onfloor == 0 or self.is_follow_mouse:
-            self._schedule_active_window_excursion()
+            self._schedule_active_window_excursion(retry_soon=True)
             return
 
         surface = self.active_window_tracker.get_surface()
         if surface is None:
-            self._schedule_active_window_excursion()
+            if (self.active_window_tracker.has_permission_error()
+                    and not self.active_window_permission_notified):
+                self.active_window_permission_notified = True
+                self.register_notification(
+                    "system",
+                    self.tr("macOS needs Accessibility or Automation permission before foreground window excursion can work. Please allow DyberPet, Python, or Terminal to control System Events in System Settings.")
+                )
+            self._schedule_active_window_excursion(retry_soon=True)
             return
 
         self.active_window_home_state = {
@@ -2130,16 +2147,7 @@ class PetWidget(QWidget):
 
 
     def _restart(self) -> None:
-        settings.save_settings()
-        settings.pet_data.save_data()
-        settings.pet_data.frozen()
-        self._stop_active_window_timers()
-        for name in ('Animation', 'Interaction', 'Scheduler'):
-            try:
-                self.stop_thread(name)
-            except Exception:
-                pass
-        self.stopAllThread.emit()
+        self.shutdown()
 
         import tempfile, subprocess
         marker = os.path.join(tempfile.gettempdir(), 'dyberpet_restart')
@@ -2148,11 +2156,11 @@ class PetWidget(QWidget):
         subprocess.Popen([sys.executable] + sys.argv)
         os._exit(0)
 
-    def quit(self) -> None:
-        """
-        关闭窗口, 系统退出
-        :return:
-        """
+    def shutdown(self) -> None:
+        if self._shutting_down:
+            return
+
+        self._shutting_down = True
         settings.save_settings()
         settings.pet_data.save_data()
         settings.pet_data.frozen()
@@ -2163,14 +2171,31 @@ class PetWidget(QWidget):
             except Exception:
                 pass
         self.stopAllThread.emit()
+
+    def quit(self) -> None:
+        """
+        关闭窗口, 系统退出
+        :return:
+        """
+        self.shutdown()
         self.close()
-        sys.exit()
+        QApplication.quit()
 
     def stop_thread(self, module_name):
-        self.workers[module_name].kill()
-        self.threads[module_name].terminate()
-        self.threads[module_name].wait()
-        #self.threads[module_name].wait()
+        worker = self.workers.pop(module_name, None)
+        thread = self.threads.pop(module_name, None)
+
+        if worker:
+            worker.kill()
+
+        if not thread:
+            return
+
+        if thread.isRunning():
+            thread.quit()
+            if not thread.wait(7000):
+                thread.terminate()
+                thread.wait()
 
     def follow_mouse_act(self):
         sender = self.sender()
@@ -2427,7 +2452,7 @@ class PetWidget(QWidget):
         # Create thread for Scheduler Module
         self.threads['Scheduler'] = QThread()
         self.workers['Scheduler'] = Scheduler_worker()
-        self.workers['Scheduler'].moveToThread(self.threads['Interaction'])
+        self.workers['Scheduler'].moveToThread(self.threads['Scheduler'])
 
         # Connect signals and slots
         self.threads['Scheduler'].started.connect(self.workers['Scheduler'].run)
@@ -2678,5 +2703,3 @@ def _build_act_param(name: str, param: str, parent: QObject, act_func) -> Action
     act = Action(name, parent)
     act.triggered.connect(lambda: act_func(param))
     return act
-
-

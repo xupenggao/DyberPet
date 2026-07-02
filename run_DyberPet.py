@@ -57,6 +57,8 @@ class DyberPetApp(QApplication):
         super(DyberPetApp, self).__init__(*args, **kwargs)
 
         self.setQuitOnLastWindowClosed(False)
+        self._shutting_down = False
+        self.aboutToQuit.connect(self.shutdown)
         screens = self.screens()
         primary_screen = self.primaryScreen()
 
@@ -219,6 +221,34 @@ class DyberPetApp(QApplication):
         self._update_check_thread.update_found.connect(self._on_startup_update_found)
         self._update_check_thread.start()
 
+    def shutdown(self):
+        if self._shutting_down:
+            return
+
+        self._shutting_down = True
+        if hasattr(self, "timer"):
+            self.timer.stop()
+
+        if hasattr(self, "p"):
+            self.p.shutdown()
+
+        thread = getattr(self, "_update_check_thread", None)
+        if not thread:
+            return
+
+        try:
+            thread.update_found.disconnect(self._on_startup_update_found)
+        except RuntimeError:
+            pass
+
+        if thread.isRunning():
+            thread.requestInterruption()
+            if not thread.wait(3000):
+                thread.terminate()
+                thread.wait()
+
+        self._update_check_thread = None
+
     def refresh_language(self):
         if hasattr(self.conp, "refresh_language"):
             self.conp.refresh_language()
@@ -241,6 +271,8 @@ class _StartupUpdateThread(QThread):
     def run(self):
         from DyberPet.updater import check_update
         has_update, version, *_ = check_update()
+        if self.isInterruptionRequested():
+            return
         if has_update and version:
             self.update_found.emit(version)
 
@@ -270,4 +302,3 @@ if __name__ == '__main__':
     app.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings)
 
     sys.exit(app.exec())
-

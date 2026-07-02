@@ -38,13 +38,31 @@ class WindowSurface:
 class ActiveWindowTracker:
     def __init__(self, current_pid: Optional[int] = None):
         self.current_pid = current_pid or os.getpid()
+        self.last_error = ""
 
     def get_surface(self) -> Optional[WindowSurface]:
+        self.last_error = ""
         if platform == "win32":
             return self._get_windows_surface()
         if platform == "darwin":
             return self._get_macos_surface()
         return None
+
+    def has_permission_error(self) -> bool:
+        error = self.last_error.lower()
+        return any(
+            marker in error
+            for marker in (
+                "not authorized",
+                "not allowed",
+                "assistive access",
+                "accessibility",
+                "辅助访问",
+                "-1743",
+                "-1719",
+                "-25211",
+            )
+        )
 
     def _get_windows_surface(self) -> Optional[WindowSurface]:
         try:
@@ -117,6 +135,28 @@ class ActiveWindowTracker:
             return ""
 
     def _get_macos_surface(self) -> Optional[WindowSurface]:
+        try:
+            return self._get_macos_surface_quartz()
+        except ImportError:
+            return self._get_macos_surface_osascript()
+        except Exception as exc:
+            self.last_error = str(exc)
+            return self._get_macos_surface_osascript()
+
+    def _get_macos_surface_quartz(self) -> Optional[WindowSurface]:
+        import Quartz
+
+        windows = Quartz.CGWindowListCopyWindowInfo(
+            Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements,
+            Quartz.kCGNullWindowID,
+        )
+        for window_info in windows:
+            surface = _surface_from_macos_window_info(window_info, self.current_pid)
+            if surface is not None:
+                return surface
+        return None
+
+    def _get_macos_surface_osascript(self) -> Optional[WindowSurface]:
         script = r'''
         tell application "System Events"
             set frontApps to application processes whose frontmost is true
@@ -136,11 +176,15 @@ class ActiveWindowTracker:
             result = subprocess.run(
                 ["osascript", "-e", script],
                 capture_output=True,
-                text=True,
                 timeout=1,
                 check=False,
             )
-            output = result.stdout.strip()
+            stdout = _decode_process_output(result.stdout)
+            stderr = _decode_process_output(result.stderr)
+            if result.returncode != 0:
+                self.last_error = stderr.strip() or stdout.strip()
+                return None
+            output = stdout.strip()
             if not output:
                 return None
 
@@ -161,8 +205,50 @@ class ActiveWindowTracker:
                 top + height,
                 owner=owner,
                 app_name=owner,
-                handle=f"{owner}:{title}",
+                handle=owner,
             )
             return surface if surface.usable() else None
-        except Exception:
+        except Exception as exc:
+            self.last_error = str(exc)
             return None
+
+
+def _surface_from_macos_window_info(window_info, current_pid: int) -> Optional[WindowSurface]:
+    if window_info.get("kCGWindowLayer") != 0:
+        return None
+    if window_info.get("kCGWindowOwnerPID") == current_pid:
+        return None
+
+    owner = str(window_info.get("kCGWindowOwnerName") or "")
+    if _ignored_macos_owner(owner):
+        return None
+
+    bounds = window_info.get("kCGWindowBounds") or {}
+    try:
+        left = int(float(bounds.get("X", 0)))
+        top = int(float(bounds.get("Y", 0)))
+        width = int(float(bounds.get("Width", 0)))
+        height = int(float(bounds.get("Height", 0)))
+    except (TypeError, ValueError):
+        return None
+
+    surface = WindowSurface(
+        left,
+        top,
+        left + width,
+        top + height,
+        owner=owner,
+        app_name=owner,
+        handle=owner,
+    )
+    return surface if surface.usable() else None
+
+
+def _ignored_macos_owner(owner: str) -> bool:
+    return any(marker in owner for marker in ("DyberPet", "Python", "osascript"))
+
+
+def _decode_process_output(value) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value or ""
