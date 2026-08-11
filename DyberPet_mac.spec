@@ -45,5 +45,8 @@ app = BUNDLE(
     coll,
     name='DyberPet.app',
     icon=None,
-    bundle_identifier=None,
+    bundle_identifier='com.dyberpet.DyberPet',
+    info_plist={
+        'NSAppleEventsUsageDescription': 'DyberPet uses System Events to find the foreground window so the pet can walk on it.',
+    },
 )
